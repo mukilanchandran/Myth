@@ -1,2 +1,5 @@
 Refference/
 *.zip
+
+# Local Netlify folder
+.netlify
