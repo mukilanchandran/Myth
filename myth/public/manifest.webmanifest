@@ -1,0 +1,16 @@
+{
+  "name": "Myth — Personal OS",
+  "short_name": "Myth",
+  "description": "One place for your work, life, goals and growth — with a private, local AI assistant.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1a2f23",
+  "theme_color": "#1a2f23",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "logo-icon.png", "sizes": "256x256", "type": "image/png", "purpose": "any" }
+  ]
+}

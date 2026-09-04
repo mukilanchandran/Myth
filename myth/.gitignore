@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Local env — never commit real values (they are inlined into the bundle anyway)
+.env
+.env.local
+.env.*.local
+
+# Scratch files from tooling
+*.tmp.mjs
+*.tmp.ps1
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Netlify CLI state (netlify dev / netlify link)
+.netlify

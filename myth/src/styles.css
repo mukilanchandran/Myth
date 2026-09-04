@@ -1,0 +1,251 @@
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.68);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 18px 50px rgba(5, 15, 25, 0.35);
+  --ink: #0e2018;
+  --hero-text: #ffffff;
+  --hero-sub: rgba(255, 255, 255, 0.96);
+  --hero-shadow: 0 2px 18px rgba(0, 0, 0, 0.75), 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+* { box-sizing: border-box; }
+
+/* no scroll indicators anywhere — content still scrolls */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Figtree', -apple-system, sans-serif;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.bg-photo {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+/* cinematic slow zoom on the landing photo — GPU transform only */
+@keyframes kenBurns {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.07); }
+}
+.bg-animated {
+  animation: kenBurns 45s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.bg-photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 16, 26, 0.38) 0%, rgba(6, 16, 26, 0.16) 42%, rgba(6, 16, 26, 0.5) 100%);
+}
+
+.hero-title {
+  color: var(--hero-text);
+  text-shadow: var(--hero-shadow);
+}
+.hero-sub {
+  color: var(--hero-sub);
+  text-shadow: var(--hero-shadow);
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 24px;
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--glass-shadow);
+  border-radius: 24px;
+}
+
+.glass-dark {
+  background: rgba(18, 32, 26, 0.62);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  border-radius: 24px;
+  color: #eef5f0;
+}
+
+.hover-lift { transition: transform 160ms ease, box-shadow 160ms ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 22px 60px rgba(15, 40, 30, 0.3); }
+
+/* invisible scrolling — no indicator anywhere */
+.scroll-y { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.scroll-y::-webkit-scrollbar { display: none; }
+
+@keyframes floatIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.float-in { animation: floatIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes pulseSoft {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.35); }
+  50% { box-shadow: 0 0 0 10px rgba(61, 220, 132, 0); }
+}
+.pulse-soft { animation: pulseSoft 2.4s ease infinite; }
+
+/* micro-interactions — GPU-cheap, no layout thrash */
+.mantine-Button-root, .mantine-ActionIcon-root {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.mantine-Button-root:active, .mantine-ActionIcon-root:active { transform: scale(0.96); }
+.mantine-Checkbox-input { transition: background 140ms ease, border-color 140ms ease; }
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise-in { animation: slideUpFade 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+.capture-input input {
+  background: transparent;
+  border: none;
+  font-size: 17px;
+  color: var(--ink);
+}
+.capture-input input::placeholder { color: rgba(22, 40, 31, 0.55); }
+
+.dock-btn {
+  transition: transform 140ms ease, background 140ms ease;
+  cursor: pointer;
+}
+.dock-btn:hover { transform: translateY(-3px) scale(1.06); }
+
+/* ---------- panels (drawers & modals): clean, solid white ---------- */
+.mantine-Modal-content, .mantine-Drawer-content {
+  background: #ffffff !important;
+}
+.mantine-Modal-header, .mantine-Drawer-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #eef1ef;
+  padding: 20px 28px 16px 28px;
+}
+.mantine-Drawer-body, .mantine-Modal-body {
+  padding: 24px 28px 28px 28px;
+  scrollbar-width: none;
+}
+.mantine-Drawer-body::-webkit-scrollbar, .mantine-Modal-body::-webkit-scrollbar { display: none; }
+
+/* inside white panels, "glass" cards become crisp bordered cards */
+.mantine-Drawer-content .glass,
+.mantine-Modal-content .glass {
+  background: #fbfcfb;
+  border: 1px solid #e9eeeb;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mantine-Drawer-content .hover-lift:hover,
+.mantine-Modal-content .hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(15, 40, 30, 0.1);
+  border-color: #d5e2da;
+}
+
+.mantine-Spotlight-content { background: #ffffff !important; }
+
+/* day-plan notification cards */
+.plan-card .plan-del { transition: opacity 140ms ease; }
+.plan-card:hover .plan-del { opacity: 0.9 !important; }
+
+/* ---------- mobile: native-app feel ---------- */
+
+/* real viewport height — 100vh overflows behind mobile browser URL bars */
+.app-root { height: 100vh; height: 100dvh; }
+
+html { -webkit-tap-highlight-color: transparent; }
+body { overscroll-behavior: none; }
+button, a, input, [role='button'] { touch-action: manipulation; }
+
+/* bottom tab bar */
+.mobile-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+  display: flex; align-items: flex-end; justify-content: space-around;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom)) 4px;
+  border-radius: 22px 22px 0 0;
+  border-bottom: none;
+}
+.mobile-tab {
+  background: none; border: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-family: 'Figtree', sans-serif; font-size: 10.5px; font-weight: 600;
+  color: rgba(20, 45, 33, 0.58);
+  padding: 4px 10px; border-radius: 12px; min-width: 58px;
+  transition: color 140ms ease, transform 120ms ease;
+}
+.mobile-tab:active { transform: scale(0.94); }
+.mobile-tab[data-active] { color: #0f766e; }
+.mobile-fab {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, #12a150, #0f766e);
+  display: grid; place-items: center;
+  margin-top: -30px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 26px rgba(15, 118, 110, 0.45);
+  transition: transform 120ms ease;
+}
+.mobile-tab:active .mobile-fab { transform: scale(0.94); }
+.mobile-more-item {
+  border-radius: 16px; background: #f7f9f8; border: 1px solid #e9eeeb;
+  cursor: pointer; transition: transform 120ms ease, border-color 140ms ease;
+}
+.mobile-more-item:active { transform: scale(0.96); }
+.mobile-more-item[data-active] { border-color: #12a150; }
+
+/* touch devices: hover lifts don't exist — keep taps crisp instead */
+@media (hover: none) {
+  .hover-lift:hover { transform: none; box-shadow: var(--glass-shadow); }
+  .dock-btn:hover { transform: none; }
+}
+
+@media (max-width: 768px) {
+  /* cheaper glass on phone GPUs — big blurs are the #1 scroll-lag source */
+  .glass { backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4); border-radius: 20px; }
+  .glass-strong { backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5); }
+  .glass-dark { backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); }
+  .bg-animated { animation: none; } /* skip the ken-burns zoom — saves battery + GPU */
+
+  /* inputs must be ≥16px or iOS force-zooms the page on focus */
+  input, textarea, select { font-size: 16px !important; }
+
+  .top-logo { height: 26px !important; }
+
+  /* widgets become a swipeable card carousel */
+  .widget-grid {
+    display: flex !important;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .widget-grid::-webkit-scrollbar { display: none; }
+  .widget-grid > * { min-width: min(82vw, 340px); scroll-snap-align: center; }
+
+  /* tighter panel padding on small screens */
+  .mantine-Modal-header, .mantine-Drawer-header { padding: 16px 18px 12px 18px; }
+  .mantine-Drawer-body, .mantine-Modal-body { padding: 14px 16px calc(20px + env(safe-area-inset-bottom)) 16px; }
+
+  /* full-bleed sheets: square off the outer offset Mantine adds */
+  .mantine-Drawer-inner { padding: 0 !important; }
+}

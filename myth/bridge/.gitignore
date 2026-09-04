@@ -1,0 +1,4 @@
+# runtime data written by server.mjs (your snapshot, queue, webhooks, memory)
+data/*
+!data/.gitkeep
+*.tmp

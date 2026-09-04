@@ -1,0 +1,40 @@
+# Full local stack: the app on :8080 and its AI brain on :11434.
+#   docker compose up -d --build
+#   docker compose exec ollama ollama pull llama3.2
+#
+# The browser talks to Ollama directly, so OLLAMA_ORIGINS must allow the
+# address you open the app from.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        VITE_APP_NAME: "Myth"
+        VITE_APP_PASSWORD: "${APP_PASSWORD:-mukilx}"
+        VITE_AI_ENDPOINT: "${AI_ENDPOINT:-http://localhost:11434/v1}"
+        VITE_AI_MODEL: "${AI_MODEL:-}"
+    container_name: myth
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: myth-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      # Keep the model resident so the first question isn't a ~30s cold start.
+      OLLAMA_KEEP_ALIVE: "1h"
+      # Browsers block cross-origin calls unless the app's origin is allowed here.
+      OLLAMA_ORIGINS: "http://localhost:8080,http://localhost:5173,http://127.0.0.1:8080"
+    restart: unless-stopped
+
+volumes:
+  ollama-models:

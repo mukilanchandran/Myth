@@ -1,0 +1,55 @@
+{
+  "name": "myth",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Personal OS — tasks, projects, notes, habits, money and a private local AI, on one page.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "oxlint src",
+    "bridge": "node bridge/server.mjs",
+    "mcp": "node bridge/mcp.mjs",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f app",
+    "dev:cloud": "npx -y netlify-cli dev"
+  },
+  "dependencies": {
+    "@mantine/charts": "^9.5.1",
+    "@mantine/core": "^9.5.1",
+    "@mantine/dates": "^9.5.1",
+    "@mantine/dropzone": "^9.5.1",
+    "@mantine/hooks": "^9.5.1",
+    "@mantine/notifications": "^9.5.1",
+    "@mantine/spotlight": "^9.5.1",
+    "@mantine/tiptap": "^9.5.1",
+    "@netlify/blobs": "^11.0.3",
+    "@tabler/icons-react": "^3.46.0",
+    "@tiptap/pm": "^3.29.2",
+    "@tiptap/react": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
+    "chrono-node": "^2.10.1",
+    "dayjs": "^1.11.21",
+    "framer-motion": "^13.0.0",
+    "pdfjs-dist": "^6.2.108",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.1",
+    "web-push": "^3.6.7",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "oxlint": "^1.75.0",
+    "playwright": "^1.62.1",
+    "vite": "^8.2.0"
+  }
+}

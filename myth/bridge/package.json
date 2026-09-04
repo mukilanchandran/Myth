@@ -1,0 +1,14 @@
+{
+  "name": "myth-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Myth as a personal data layer — local REST API, webhooks and an MCP server for the Myth app. Zero dependencies.",
+  "scripts": {
+    "start": "node server.mjs",
+    "mcp": "node mcp.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

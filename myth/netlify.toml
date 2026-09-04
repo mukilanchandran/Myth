@@ -1,0 +1,42 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Serverless functions: the cloud-storage API and the scheduled push digests.
+# Their secrets (MYTH_SYNC_KEY, VAPID_*) are set in the Netlify UI, never here.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Cloud storage API → netlify/functions/cloud.mjs.
+# Must come before the SPA catch-all: the first matching rule wins.
+[[redirects]]
+  from = "/api/cloud/*"
+  to = "/.netlify/functions/cloud/:splat"
+  status = 200
+
+# Single-page app: unknown paths render the app shell.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
