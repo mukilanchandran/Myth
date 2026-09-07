@@ -5,6 +5,7 @@
 // Works fully offline; no external calls.
 import * as chrono from 'chrono-node';
 import dayjs from 'dayjs';
+import { contextFor, contextSummary, extractPeople } from './context.js';
 
 const RX = {
   expense: /(?:spent|paid|bought|purchase[d]?|bill)\s+(?:₹|rs\.?\s*|\$)?\s*(\d[\d,]*(?:\.\d+)?)|(?:₹|rs\.?\s*)\s*(\d[\d,]*(?:\.\d+)?)/i,
@@ -25,11 +26,7 @@ const RX = {
   reminder: /^remind me (?:to|about|of)\s+/i,
   urgent: /\b(?:urgent|asap|critical|important|p1|high priority)\b/i,
   low: /\b(?:low priority|someday|later|whenever|p4|p5)\b/i,
-  personalHint: /\b(?:home|family|mom|dad|amma|appa|gym|workout|doctor|health|grocery|groceries|rent|emi|travel|trip|friend|wedding|temple|prayer|personal)\b/i,
-  workHint: /\b(?:client|office|design|figma|sprint|deploy|release|manager|standup|prototype|wireframe|handoff|stakeholder|work|lms|demo)\b/i,
   project: /\bproject\s+["']?([\w][\w\s-]{1,40}?)["']?(?:\s*[,.]|$)/i,
-  forceWork: /(?:^|\s)!w\b/i,
-  forcePersonal: /(?:^|\s)!p\b/i,
 };
 
 // Everyday shorthand chrono doesn't understand → words it does.
@@ -54,7 +51,7 @@ export function normalizeText(raw) {
 
 // Split one free-form sentence into independent capture clauses:
 // "tomorrow I have meeting, coming sunday my sister birthday" → 2 items.
-export function parseMulti(raw, currentMode, projects = []) {
+export function parseMulti(raw, projects = []) {
   const normalized = normalizeText(raw);
   const parts = normalized
     .split(/\n|;|,(?!\d)|\band\s+(?=(?:i\s|my\s|on\s|next\s|this\s|tomorrow|today|tonight|meeting|call|buy|pay|renew|book|spent|paid|habit|idea|note|learn|study|remind|plan)\b)/i)
@@ -64,21 +61,13 @@ export function parseMulti(raw, currentMode, projects = []) {
   return clauses
     .map((c) => c.replace(/^(?:also\s+|then\s+|and\s+|plus\s+)/i, '').trim())
     .filter((c) => c.length > 1)
-    .map((c) => parseCapture(c, currentMode, projects))
+    .map((c) => parseCapture(c, projects))
     .filter(Boolean);
 }
 
-export function parseCapture(raw, currentMode, projects = []) {
+export function parseCapture(raw, projects = []) {
   let text = normalizeText(raw.trim());
   if (!text) return null;
-
-  // --- mode detection ---
-  let mode = currentMode;
-  if (RX.forceWork.test(text)) mode = 'work';
-  else if (RX.forcePersonal.test(text)) mode = 'personal';
-  else if (RX.personalHint.test(text) && !RX.workHint.test(text)) mode = 'personal';
-  else if (RX.workHint.test(text) && !RX.personalHint.test(text)) mode = 'work';
-  text = text.replace(RX.forceWork, ' ').replace(RX.forcePersonal, ' ').trim();
 
   // --- date/time extraction (remove EVERY date/time fragment from the title) ---
   const chronoResults = chrono.parse(text, new Date(), { forwardDate: true });
@@ -120,8 +109,8 @@ export function parseCapture(raw, currentMode, projects = []) {
   // habits/ideas/notes keep their full wording — date words are part of the name
   const rawTitle = normalize(text);
   const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-  const base = { mode, raw, title: cap(title) };
-  const baseRaw = { mode, raw, title: cap(rawTitle) };
+  const base = { raw, title: cap(title) };
+  const baseRaw = { raw, title: cap(rawTitle) };
 
   // --- classification (ordered by specificity) ---
   const expMatch = text.match(RX.expense);
@@ -131,7 +120,7 @@ export function parseCapture(raw, currentMode, projects = []) {
   }
   if (expMatch && !RX.meeting.test(text)) {
     const amount = parseFloat((expMatch[1] ?? expMatch[2]).replace(/,/g, ''));
-    return { kind: 'expense', ...base, mode: 'personal', amount, category: guessCategory(text), date: due ?? dayjs().format('YYYY-MM-DD') };
+    return { kind: 'expense', ...base, amount, category: guessCategory(text), date: due ?? dayjs().format('YYYY-MM-DD') };
   }
   // "habit: read" or recurring phrasing → habit ("drink water daily")
   if (RX.habit.test(raw.trim()) || RX.habitDaily.test(text)) {
@@ -157,7 +146,15 @@ export function parseCapture(raw, currentMode, projects = []) {
   // "book flight", "finish LMS demo" are to-dos, not calendar entries
   const actionable = (cleanText || text).replace(/^(?:i\s+(?:have|need to|want to|will|am going to)\s+)/i, '');
   const startsWithAction = RX.actionVerb.test(actionable) && !/^(?:meet|call)\s+with\b/i.test(actionable);
-  if (RX.meeting.test(text) && !startsWithAction) return { kind: 'meeting', ...base, date: due ?? dayjs().format('YYYY-MM-DD'), time, projectId };
+  if (RX.meeting.test(text) && !startsWithAction) {
+    // "client meeting tomorrow 10am at Acme office with Ravi" — the place and the people feed the Context Engine
+    const src = cleanText || text;
+    const locMatch = src.match(/\b(?:at|in|@)\s+([A-Z][\w&'.-]*(?:\s+(?!with\b)[\w&'.-]+){0,4})(?=\s+with\b|\s*$)/);
+    const location = locMatch ? locMatch[1].trim() : '';
+    const participants = extractPeople(text).map((p) => p.name).join(', ');
+    const mTitle = locMatch ? cap(normalize(src.replace(locMatch[0], ' ').replace(/\s{2,}/g, ' ').trim()) || base.title) : base.title;
+    return { kind: 'meeting', ...base, title: mTitle, date: due ?? dayjs().format('YYYY-MM-DD'), time, projectId, location, participants };
+  }
   if (RX.event.test(text) && !startsWithAction) return { kind: 'event', ...base, date: due ?? dayjs().format('YYYY-MM-DD'), time };
   if (RX.reminder.test(raw.trim())) {
     const t = cap(normalize(cleanText.replace(RX.reminder, '').trim()) || title);
@@ -182,39 +179,48 @@ function guessCategory(text) {
 }
 
 const isToday = (d) => d && dayjs(d).isSame(dayjs(), 'day');
+const stateOf = (store) => (store.getState ? store.getState() : store);
 
 // Executes a parsed capture against the store. Returns human confirmation text.
 export function executeCapture(parsed, store) {
   const s = store.getState ? store.getState() : store;
   switch (parsed.kind) {
     case 'task': {
-      s.addTask({ title: parsed.title, mode: parsed.mode, due: parsed.due, priority: parsed.priority, projectId: parsed.projectId });
+      s.addTask({ title: parsed.title, due: parsed.due, priority: parsed.priority, projectId: parsed.projectId });
       s.addXp('capture');
       // anything committed for today also lands on Today's plan
       if (isToday(parsed.due)) s.addPlanItems([parsed.title]);
-      return `Task added${parsed.due ? ` · due ${dayjs(parsed.due).format('ddd, MMM D')}` : ''}${parsed.priority === 5 ? ' · high priority' : ''}${isToday(parsed.due) ? " · on today's plan" : ''} → ${parsed.mode} mode`;
+      return `Task added${parsed.due ? ` · due ${dayjs(parsed.due).format('ddd, MMM D')}` : ''}${parsed.priority === 5 ? ' · high priority' : ''}${isToday(parsed.due) ? " · on today's plan" : ''}`;
     }
     case 'idea':
-      s.addNote({ title: parsed.title, type: 'idea', mode: parsed.mode, projectId: parsed.projectId });
+      s.addNote({ title: parsed.title, type: 'idea', projectId: parsed.projectId });
       s.addXp('capture');
-      return `Idea saved to your vault (${parsed.mode})`;
+      return 'Idea saved to your vault';
     case 'note':
-      s.addNote({ title: parsed.title, type: 'note', mode: parsed.mode, projectId: parsed.projectId });
+      s.addNote({ title: parsed.title, type: 'note', projectId: parsed.projectId });
       s.addXp('capture');
-      return `Note saved (${parsed.mode})`;
+      return 'Note saved';
     case 'meeting': {
-      s.addNote({
-        title: parsed.title, type: 'meeting', mode: parsed.mode, projectId: parsed.projectId,
-        meeting: { date: parsed.date, time: parsed.time, participants: '', agenda: '', actions: '' },
+      const note = s.addNote({
+        title: parsed.title, type: 'meeting', projectId: parsed.projectId,
+        meeting: { date: parsed.date, time: parsed.time, participants: parsed.participants ?? '', location: parsed.location ?? '', agenda: '', actions: '' },
       });
-      s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'meeting', mode: parsed.mode });
-      s.addTask({ title: parsed.title, mode: parsed.mode, due: parsed.date, priority: 4, projectId: parsed.projectId, tags: ['meeting'] });
+      s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'meeting' });
+      s.addTask({ title: parsed.title, due: parsed.date, priority: 4, projectId: parsed.projectId, tags: ['meeting'] });
       if (isToday(parsed.date)) s.addPlanItems([parsed.title]);
       s.addXp('meeting');
-      return `Meeting on calendar + task list for ${dayjs(parsed.date).format('ddd, MMM D')}${parsed.time ? ` at ${parsed.time}` : ''}${isToday(parsed.date) ? " · on today's plan" : ''}`;
+      // the Context Engine links the new meeting to its project, open tasks, notes, documents and people;
+      // when the project was only implied by the wording, make the link explicit
+      let ctx = contextFor(stateOf(store), `note:${note.id}`);
+      if (ctx?.project && !parsed.projectId) {
+        s.updateNote(note.id, { projectId: ctx.project.id });
+        ctx = contextFor(stateOf(store), `note:${note.id}`);
+      }
+      const linked = ctx ? contextSummary(ctx) : '';
+      return `Meeting on calendar + task list for ${dayjs(parsed.date).format('ddd, MMM D')}${parsed.time ? ` at ${parsed.time}` : ''}${isToday(parsed.date) ? " · on today's plan" : ''}${linked ? ` · ${linked}` : ''}`;
     }
     case 'event':
-      s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'event', mode: parsed.mode });
+      s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'event' });
       if (isToday(parsed.date)) s.addPlanItems([parsed.title]);
       return `Added to calendar — ${dayjs(parsed.date).format('ddd, MMM D')}${parsed.time ? ` at ${parsed.time}` : ''}`;
     case 'expense':
@@ -224,10 +230,10 @@ export function executeCapture(parsed, store) {
       s.addTransaction({ type: 'income', amount: parsed.amount, category: parsed.category, note: parsed.title, date: parsed.date });
       return `Income ₹${parsed.amount.toLocaleString('en-IN')} recorded`;
     case 'habit':
-      s.addHabit({ name: parsed.title, mode: 'personal' });
+      s.addHabit({ name: parsed.title });
       return `New habit "${parsed.title}" — tracking starts today`;
     case 'birthday':
-      s.addEvent({ title: parsed.title, date: parsed.date, kind: 'birthday', yearly: true, mode: 'personal' });
+      s.addEvent({ title: parsed.title, date: parsed.date, kind: 'birthday', yearly: true });
       return `Birthday saved for ${dayjs(parsed.date).format('ddd, MMM D')} — I'll remind you every year`;
     case 'learning':
       s.addLearning(parsed.title);
@@ -240,8 +246,8 @@ export function executeCapture(parsed, store) {
       s.addPlanItems([parsed.title]);
       return `Added to today's plan`;
     case 'project': {
-      s.addProject({ name: parsed.title, mode: parsed.mode });
-      return `Project "${parsed.title}" created (${parsed.mode})`;
+      s.addProject({ name: parsed.title });
+      return `Project "${parsed.title}" created`;
     }
     default:
       return 'Captured.';

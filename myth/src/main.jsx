@@ -15,8 +15,14 @@ import './styles.css';
 
 import { theme } from './theme';
 import App from './App';
+import { useStore } from './store/useStore';
+import { useUI } from './store/useUI';
 
 dayjs.extend(customParseFormat);
+
+// Exposed for the smoke tests and screenshot scripts (scripts/*.mjs) — this is a
+// private single-user app, so there is nothing to hide from the console.
+window.__myth = { useStore, useUI };
 
 // Service worker: required for app-like notifications (iOS home-screen installs
 // only deliver notifications through a service worker, never `new Notification`).

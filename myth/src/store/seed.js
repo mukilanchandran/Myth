@@ -21,35 +21,36 @@ export function seedIfNeeded(store) {
     s.setSettings({ seededV2: true });
   }
 
+  seedContextDemo(store);
+
   if (s.settings.seeded) return;
 
   const d = (n) => dayjs().add(n, 'day').format('YYYY-MM-DD');
 
-  // --- work projects ---
-  const p1 = s.addProject({ name: 'Myth Platform', desc: 'Personal OS — design & build', mode: 'work', color: '#12a150' });
-  const p2 = s.addProject({ name: 'Client Dashboard Redesign', desc: 'SaaS analytics dashboard UX revamp', mode: 'work', color: '#1971c2' });
-  const p3 = s.addProject({ name: 'Home Renovation', desc: 'Hall + balcony refresh', mode: 'personal', color: '#e8590c' });
+  // --- projects ---
+  const p1 = s.addProject({ name: 'Myth Platform', desc: 'Personal OS — design & build', color: '#12a150' });
+  const p2 = s.addProject({ name: 'Client Dashboard Redesign', desc: 'SaaS analytics dashboard UX revamp', color: '#1971c2' });
+  const p3 = s.addProject({ name: 'Home Renovation', desc: 'Hall + balcony refresh', color: '#e8590c' });
 
-  // --- work tasks ---
-  s.addTask({ title: 'Finalize landing page glass UI', mode: 'work', projectId: p1.id, priority: 5, due: d(1), status: 'doing' });
-  s.addTask({ title: 'Wireframes for reports module', mode: 'work', projectId: p1.id, priority: 4, due: d(3) });
-  s.addTask({ title: 'Competitor analysis — 3 dashboards', mode: 'work', projectId: p2.id, priority: 3, due: d(5) });
-  s.addTask({ title: 'Prepare design review deck', mode: 'work', projectId: p2.id, priority: 4, due: d(2) });
-  s.addTask({ title: 'Update portfolio with GIS project', mode: 'work', priority: 2, due: d(10) });
+  // --- tasks ---
+  s.addTask({ title: 'Finalize landing page glass UI', projectId: p1.id, priority: 5, due: d(1), status: 'doing' });
+  s.addTask({ title: 'Wireframes for reports module', projectId: p1.id, priority: 4, due: d(3) });
+  s.addTask({ title: 'Competitor analysis — 3 dashboards', projectId: p2.id, priority: 3, due: d(5) });
+  s.addTask({ title: 'Prepare design review deck', projectId: p2.id, priority: 4, due: d(2) });
+  s.addTask({ title: 'Update portfolio with GIS project', priority: 2, due: d(10) });
 
-  // --- personal tasks ---
-  s.addTask({ title: 'Book dentist appointment', mode: 'personal', priority: 4, due: d(2) });
-  s.addTask({ title: 'Renew bike insurance', mode: 'personal', priority: 5, due: d(6) });
-  s.addTask({ title: 'Buy paint samples', mode: 'personal', projectId: p3.id, priority: 3, due: d(4) });
+  s.addTask({ title: 'Book dentist appointment', priority: 4, due: d(2) });
+  s.addTask({ title: 'Renew bike insurance', priority: 5, due: d(6) });
+  s.addTask({ title: 'Buy paint samples', projectId: p3.id, priority: 3, due: d(4) });
 
   // --- notes / ideas / meeting ---
-  s.addNote({ title: 'AI-powered field survey app for farmers', type: 'idea', mode: 'work' });
-  s.addNote({ title: 'Weekend trip — Ooty or Kodaikanal?', type: 'idea', mode: 'personal' });
+  s.addNote({ title: 'AI-powered field survey app for farmers', type: 'idea' });
+  s.addNote({ title: 'Weekend trip — Ooty or Kodaikanal?', type: 'idea' });
   s.addNote({
-    title: 'Sprint kickoff with product team', type: 'meeting', mode: 'work', projectId: p2.id,
+    title: 'Sprint kickoff with product team', type: 'meeting', projectId: p2.id,
     meeting: { date: d(0), time: '10:30', participants: 'PM, Dev lead, Me', agenda: 'Scope Q3 redesign', actions: 'Share moodboard by Friday' },
   });
-  s.addNote({ title: 'Figma auto-layout wrap trick', body: 'Use min-width on children to control wrap breakpoints.', type: 'note', mode: 'work' });
+  s.addNote({ title: 'Figma auto-layout wrap trick', body: 'Use min-width on children to control wrap breakpoints.', type: 'note' });
 
   // --- habits ---
   const habitDefs = [
@@ -57,7 +58,7 @@ export function seedIfNeeded(store) {
     { name: 'Read 20 min', icon: 'read' }, { name: 'Meditation', icon: 'meditate' },
     { name: 'No junk food', icon: 'eat' },
   ];
-  habitDefs.forEach((h) => s.addHabit({ ...h, mode: 'personal' }));
+  habitDefs.forEach((h) => s.addHabit(h));
   // backfill some history so charts are alive
   const st = store.getState();
   st.habits.forEach((h, i) => {
@@ -79,12 +80,42 @@ export function seedIfNeeded(store) {
   s.addTransaction({ type: 'expense', amount: 1199, category: 'Entertainment', note: 'Annual Spotify', date: d(-1) });
 
   // --- events ---
-  s.addEvent({ title: "Amma's birthday", date: dayjs().add(12, 'day').format('YYYY-MM-DD'), kind: 'birthday', yearly: true, mode: 'personal' });
-  s.addEvent({ title: 'Electricity bill', date: d(7), kind: 'bill', mode: 'personal' });
-  s.addEvent({ title: 'Design review', date: d(2), time: '15:00', kind: 'meeting', mode: 'work' });
+  s.addEvent({ title: "Amma's birthday", date: dayjs().add(12, 'day').format('YYYY-MM-DD'), kind: 'birthday', yearly: true });
+  s.addEvent({ title: 'Electricity bill', date: d(7), kind: 'bill' });
+  s.addEvent({ title: 'Design review', date: d(2), time: '15:00', kind: 'meeting' });
 
   // --- journal ---
   s.upsertJournal({ date: d(-1), mood: 4, energy: 4, gratitude: 'Good progress on the platform build', reflection: 'Deep work morning went well.', wins: 'Shipped login flow' });
 
   store.getState().setSettings({ seeded: true });
+  seedContextDemo(store);
+}
+
+// Context Engine demo (runs once, also for already-seeded users): a client thread
+// with history, so the landing-page briefing has something real to say.
+function seedContextDemo(store) {
+  const s = store.getState();
+  if (s.settings.seededV3) return;
+  const day = (n) => dayjs().add(n, 'day').format('YYYY-MM-DD');
+  const proj = s.projects.find((p) => /client dashboard/i.test(p.name)) ?? s.projects[0] ?? null;
+  if (!proj) return; // first run: the main seed creates the projects, then calls back in
+  if (!s.notes.some((n) => n.type === 'meeting' && /walkthrough/i.test(n.title))) {
+    s.addNote({
+      title: 'Client review — dashboard v1', type: 'meeting', projectId: proj.id, created: dayjs().subtract(9, 'day').toISOString(),
+      meeting: {
+        date: day(-9), time: '11:00', participants: 'Ravi (Acme), Priya (PM), Me', location: 'Acme office, Guindy',
+        agenda: 'Walked through v1. KPI cards need rework; Ravi wants a PDF export for board decks.',
+        actions: '[x] Send meeting recap to Ravi\nShare updated moodboard with Acme\nCollect final KPI list from Ravi\nEstimate PDF export effort',
+      },
+    });
+    s.addNote({
+      title: 'Client meeting — dashboard v2 walkthrough', type: 'meeting', projectId: proj.id,
+      meeting: { date: day(1), time: '10:00', participants: 'Ravi (Acme), Me', location: 'Acme office, Guindy', agenda: 'Present v2 KPI cards; agree on export scope and launch date.', actions: '' },
+    });
+    s.addEvent({ title: 'Client meeting — dashboard v2 walkthrough', date: day(1), time: '10:00', kind: 'meeting' });
+    s.addNote({ title: 'Acme dashboard — export options', type: 'note', projectId: proj.id, body: 'PDF export via headless render vs. CSV-only. Ravi prefers PDF for board decks; CSV is a quick win.' });
+    s.addDriveItem({ kind: 'link', title: 'Client dashboard — Figma v2', url: 'https://www.figma.com/file/client-dashboard-v2', tags: ['client dashboard redesign', 'acme'] });
+    s.addDriveItem({ kind: 'text', title: 'Acme KPI list (draft)', body: 'Revenue, active users, churn, NPS — final list pending from Ravi.', tags: ['acme', 'client dashboard'] });
+  }
+  s.setSettings({ seededV3: true });
 }

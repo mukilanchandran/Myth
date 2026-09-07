@@ -1,24 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Drawer, Modal, Text, Group, Badge } from '@mantine/core';
+import { Box, Drawer, Modal, Text } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Spotlight } from '@mantine/spotlight';
-import { IconChecklist, IconFolders, IconNotes, IconCalendarEvent, IconSearch, IconSparkles } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
+import { IconChecklist, IconFolders, IconNotes, IconCalendarEvent, IconSearch } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
+import { useUI } from '../store/useUI';
 import { seedIfNeeded } from '../store/seed';
 import { runReminderNotifications } from '../notify';
 import * as cloud from '../cloud/netlify';
 import TopBar from './TopBar';
 import CaptureBar from './CaptureBar';
-import Widgets from './Widgets';
+import CommandCenter, { CommandHero } from './CommandCenter';
+import ContextStrip from './ContextStrip';
+import MithNowSheet, { MithNowButton } from './MithNow';
+import ProjectProposal from './ProjectProposal';
+import PlannerPanel from './planner/PlannerPanel';
 import Dock from './Dock';
 import MobileNav from './MobileNav';
 import ChatAssistant from './ChatAssistant';
-import { pickSpark, dayLine, generateSpark } from '../ai/spark';
 import { keepModelWarm } from '../ai/assistant';
 import { AI_WARMUP, asset } from '../config/env';
 import TodayPanel from './panels/TodayPanel';
+import ContextPanel from './panels/ContextPanel';
 import TasksPanel from './panels/TasksPanel';
 import ProjectsPanel from './panels/ProjectsPanel';
 import NotesPanel from './panels/NotesPanel';
@@ -32,6 +36,7 @@ import SettingsPanel from './panels/SettingsPanel';
 
 const PANEL_META = {
   today: { title: 'Daily planner', sub: 'Your day at a glance — score, priorities, meetings.', comp: TodayPanel },
+  context: { title: 'Context engine', sub: 'What connects to what — meeting prep, follow-ups and related work.', comp: ContextPanel },
   tasks: { title: 'Tasks', sub: 'Everything you committed to, sorted by urgency.', comp: TasksPanel },
   projects: { title: 'Projects', sub: 'Tasks, milestones, meeting notes & documents in one place.', comp: ProjectsPanel },
   notes: { title: 'Notes, ideas & meetings', sub: 'Your second brain — searchable and linked to projects.', comp: NotesPanel },
@@ -45,9 +50,11 @@ const PANEL_META = {
 
 export default function Shell() {
   const state = useStore();
-  const { settings } = state;
-  const [panel, setPanel] = useState(null);
+  // panel state lives in useUI so widgets, reminders and the Today panel can deep-link
+  const panel = useUI((s) => s.panel);
+  const setPanel = useUI((s) => s.setPanel);
   const [inlineChat, setInlineChat] = useState(false);
+  const [nowOpen, setNowOpen] = useState(false); // MITH NOW sheet
 
   useEffect(() => {
     // no popup after login — reminders live quietly in the bell icon
@@ -92,32 +99,20 @@ export default function Shell() {
     return () => clearInterval(id);
   }, []);
 
-  const hour = dayjs().hour();
-  const heyLine = hour < 5 ? 'Hey Boss, burning the midnight oil?' : hour < 12 ? 'Hey Boss, happy morning!' : hour < 17 ? 'Hey Boss, good afternoon!' : 'Hey Boss, winding down?';
-
-  // a fresh spark every open: instant curated line, upgraded by the local AI when it responds
-  const [spark, setSpark] = useState(() => pickSpark());
-  const friendLine = useMemo(() => dayLine(), []);
-  useEffect(() => {
-    let alive = true;
-    generateSpark(useStore.getState()).then((s) => { if (alive && s) setSpark(s); });
-    return () => { alive = false; };
-  }, []);
-
   const spotlightActions = useMemo(() => {
     const acts = [];
     state.tasks.slice(0, 60).forEach((t) =>
-      acts.push({ id: `t${t.id}`, label: t.title, description: `Task · ${t.mode} · ${t.status}`, leftSection: <IconChecklist size={16} />, onClick: () => setPanel('tasks') }));
+      acts.push({ id: `t${t.id}`, label: t.title, description: `Task · ${t.status}`, leftSection: <IconChecklist size={16} />, onClick: () => setPanel('tasks') }));
     state.projects.forEach((p) =>
-      acts.push({ id: `p${p.id}`, label: p.name, description: `Project · ${p.mode}`, leftSection: <IconFolders size={16} />, onClick: () => setPanel('projects') }));
+      acts.push({ id: `p${p.id}`, label: p.name, description: 'Project', leftSection: <IconFolders size={16} />, onClick: () => setPanel('projects') }));
     state.notes.slice(0, 60).forEach((n) =>
-      acts.push({ id: `n${n.id}`, label: n.title, description: `${n.type} · ${n.mode}`, leftSection: <IconNotes size={16} />, onClick: () => setPanel('notes') }));
+      acts.push({ id: `n${n.id}`, label: n.title, description: n.type, leftSection: <IconNotes size={16} />, onClick: () => setPanel('notes') }));
     state.events.forEach((e) =>
       acts.push({ id: `e${e.id}`, label: e.title, description: `Event · ${dayjs(e.date).format('MMM D')}`, leftSection: <IconCalendarEvent size={16} />, onClick: () => setPanel('calendar') }));
     state.learning.forEach((l) =>
       acts.push({ id: `l${l.id}`, label: l.title, description: 'Learning pipeline', leftSection: <IconNotes size={16} />, onClick: () => setPanel('learning') }));
     return acts;
-  }, [state.tasks, state.projects, state.notes, state.events, state.learning]);
+  }, [state.tasks, state.projects, state.notes, state.events, state.learning, setPanel]);
 
   const meta = PANEL_META[panel];
 
@@ -161,44 +156,37 @@ export default function Shell() {
       >
         <TopBar onOpen={setPanel} />
 
+        {/* desktop: sections float apart with auto margins and the column scrolls only if
+            they ever outgrow the viewport — nothing gets clipped behind the dock */}
         <Box
-          className={mobile ? 'scroll-y' : undefined}
+          className="scroll-y"
           style={{
             flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
-            overflow: mobile ? undefined : 'hidden',
-            justifyContent: mobile ? 'flex-start' : 'space-evenly',
+            overflowX: mobile ? undefined : 'hidden',
+            justifyContent: 'flex-start',
             gap: mobile ? 18 : 0,
             paddingTop: mobile ? 8 : 0,
             paddingBottom: mobile ? 'calc(92px + env(safe-area-inset-bottom))' : 86,
           }}
         >
-          <motion.div
-            initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            style={{ textAlign: 'center', padding: '0 16px' }}
-          >
-            <Text className="hero-title" fz={{ base: 26, sm: 36 }} fw={800} lh={1.12}>
-              {heyLine}
-            </Text>
-            <Text className="hero-sub" fz={{ base: 13.5, sm: 15 }} fw={600} mt={4}>
-              {friendLine}
-            </Text>
-            <Group justify="center" mt={8} gap={8}>
-              <Badge
-                variant="light" radius="xl" leftSection={<IconSparkles size={11} />}
-                styles={{ root: { background: 'rgba(255,255,255,0.22)', color: '#fff', backdropFilter: 'blur(10px)', textTransform: 'none', fontWeight: 500, border: '1px solid rgba(255,255,255,0.28)', maxWidth: 'min(90vw, 560px)', height: 'auto', padding: '4px 12px' } }}
-              >
-                <span style={{ whiteSpace: 'normal', lineHeight: 1.35, fontSize: 11.5 }}>{spark}</span>
-              </Badge>
-            </Group>
-          </motion.div>
+          {/* Life Command Center: greeting + how much of the day is done */}
+          <CommandHero mobile={mobile}>
+            {/* MITH NOW — the one big decision button */}
+            <MithNowButton mobile={mobile} onClick={() => setNowOpen(true)} />
+          </CommandHero>
 
-          <Box w="100%" px={{ base: 12, sm: 24 }}>
+          <Box w="100%" px={{ base: 12, sm: 24 }} my={mobile ? 0 : 'auto'}>
             <CaptureBar onExpand={() => setPanel('assistant')} onChatOpen={setInlineChat} />
           </Box>
 
-          {/* the inline conversation takes the widgets' space so the page never scrolls */}
-          {!inlineChat && <Widgets onOpen={setPanel} />}
+          {/* the inline conversation takes the cards' space so the page never scrolls */}
+          {!inlineChat && (
+            <Box w="100%" my={mobile ? 0 : 'auto'}>
+              {/* the Context Engine's next briefing sits above the Command Center */}
+              <ContextStrip />
+              <CommandCenter onOpen={setPanel} />
+            </Box>
+          )}
         </Box>
 
         {mobile
@@ -265,6 +253,26 @@ export default function Shell() {
       >
         <ReportsPanel />
       </Modal>
+
+      {/* Myth Planner: trips, events, study… — full modal, full-screen on phones */}
+      <Modal
+        opened={panel === 'planner'}
+        onClose={() => setPanel(null)}
+        size="xl"
+        radius={mobile ? 0 : 'xl'}
+        fullScreen={mobile}
+        title={<div><Text fw={800} fz={20}>Myth Planner</Text><Text fz={12.5} c="dimmed" mt={2}>Trips, events, exams, launches — plan it, confirm it, then go live.</Text></div>}
+        centered={!mobile}
+        styles={{ content: { maxHeight: mobile ? '100dvh' : '92vh' }, body: { overflowY: 'auto' } }}
+      >
+        <PlannerPanel />
+      </Modal>
+
+      {/* MITH NOW: "What should I do now?" — real-time decision support */}
+      <MithNowSheet opened={nowOpen} onClose={() => setNowOpen(false)} onOpen={setPanel} />
+
+      {/* Automatic project creation: the "I drafted a plan — Create project?" sheet */}
+      <ProjectProposal />
 
       <Spotlight
         actions={spotlightActions}

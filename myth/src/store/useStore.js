@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import dayjs from 'dayjs';
 import { APP_PASSWORD, AI_MODEL } from '../config/env';
+import { buildPlan, createProjectFromPlan } from '../ai/projectPlanner';
+import { emptyLearn, learnSkip, learnStart, learnFinish } from '../ai/mithNow';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 export const today = () => dayjs().format('YYYY-MM-DD');
@@ -29,16 +31,26 @@ export const useStore = create(
       // ---------- settings ----------
       settings: {
         name: 'Mukil',
-        mode: 'work', // single combined flow (work + personal merged)
         aiEndpoint: '',
         aiModel: AI_MODEL, // empty = auto-pick the best installed model
         aiKey: '',
         cloudKey: '', // Netlify sync key (= MYTH_SYNC_KEY on the site) — Settings → Cloud storage & sync
         cloudUrl: '', // optional Netlify site URL when the app runs elsewhere (dev server, Docker)
         notifications: true,
+        notifyBudget: 4, // lock-screen notifications per day (Notification Intelligence Engine)
+        quietStart: 22,  // quiet hours: nothing reaches the lock screen from here…
+        quietEnd: 7,     // …until here
         seeded: false,
       },
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
+
+      // ---------- notification intelligence: snoozed / dismissed ----------
+      // key -> { until: ISO, fp } — see isMuted() in src/ai/notifications.js
+      notifyMuted: {},
+      muteNotification: (key, until, fp = null) =>
+        set((s) => ({ notifyMuted: { ...s.notifyMuted, [key]: { until, fp } } })),
+      unmuteNotification: (key) =>
+        set((s) => { const next = { ...s.notifyMuted }; delete next[key]; return { notifyMuted: next }; }),
 
       // ---------- gamification ----------
       xp: { points: 0, streakCount: 0, streakLastDate: null },
@@ -55,12 +67,13 @@ export const useStore = create(
         }),
 
       // ---------- tasks ----------
+      // optional fields: noteId (the meeting a follow-up / action item came from), tags
       tasks: [],
       addTask: (t) =>
         set((s) => ({
           tasks: [
             {
-              id: uid(), title: '', desc: '', mode: s.settings.mode, projectId: null,
+              id: uid(), title: '', desc: '', projectId: null,
               priority: 3, status: 'todo', due: null, tags: [], estimate: null,
               created: new Date().toISOString(), completedAt: null, ...t,
             },
@@ -68,7 +81,14 @@ export const useStore = create(
           ],
         })),
       updateTask: (id, patch) =>
-        set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
+        set((s) => ({
+          tasks: s.tasks.map((t) => {
+            if (t.id !== id) return t;
+            // remember when work actually started, so a task that stalls can be noticed
+            const startedAt = patch.status === 'doing' ? (t.startedAt ?? new Date().toISOString()) : patch.status === 'todo' ? null : t.startedAt ?? null;
+            return { ...t, ...patch, startedAt };
+          }),
+        })),
       completeTask: (id) => {
         set((s) => ({
           tasks: s.tasks.map((t) =>
@@ -83,7 +103,7 @@ export const useStore = create(
       projects: [],
       addProject: (p) => {
         const proj = {
-          id: uid(), name: 'Untitled project', desc: '', mode: get().settings.mode,
+          id: uid(), name: 'Untitled project', desc: '',
           color: '#12a150', status: 'active', deadline: null, milestones: [],
           created: new Date().toISOString(), ...p,
         };
@@ -103,7 +123,7 @@ export const useStore = create(
       notes: [],
       addNote: (n) => {
         const note = {
-          id: uid(), title: '', body: '', type: 'note', mode: get().settings.mode,
+          id: uid(), title: '', body: '', type: 'note',
           projectId: null, pinned: false, meeting: null,
           created: new Date().toISOString(), updated: new Date().toISOString(), ...n,
         };
@@ -173,7 +193,7 @@ export const useStore = create(
           journal: [
             {
               id: uid(), date: today(), ts: Date.now(), mood: mood ?? 3,
-              text: text ?? '', mode: s.settings.mode,
+              text: text ?? '',
             },
             ...s.journal,
           ],
@@ -193,10 +213,10 @@ export const useStore = create(
       },
 
       // ---------- day plan (morning "what I'll do today" stories) ----------
-      plans: {}, // `${YYYY-MM-DD}|${mode}` -> [{id, text, done, doneAt}]
-      addPlanItems: (texts) =>
+      plans: {}, // 'YYYY-MM-DD' -> [{id, text, done, doneAt}]
+      addPlanItems: (texts, date = today()) =>
         set((s) => {
-          const key = `${today()}|${s.settings.mode}`;
+          const key = date;
           const existing = s.plans[key] ?? [];
           const fresh = texts
             .map((t) => t.trim())
@@ -206,7 +226,7 @@ export const useStore = create(
         }),
       togglePlanItem: (id) => {
         const s = get();
-        const key = `${today()}|${s.settings.mode}`;
+        const key = today();
         const items = s.plans[key] ?? [];
         const target = items.find((i) => i.id === id);
         set({
@@ -221,7 +241,7 @@ export const useStore = create(
       },
       deletePlanItem: (id) =>
         set((s) => {
-          const key = `${today()}|${s.settings.mode}`;
+          const key = today();
           return { plans: { ...s.plans, [key]: (s.plans[key] ?? []).filter((i) => i.id !== id) } };
         }),
 
@@ -243,11 +263,118 @@ export const useStore = create(
       addEvent: (e) =>
         set((s) => ({
           events: [
-            { id: uid(), title: '', date: today(), time: null, kind: 'event', mode: s.settings.mode, yearly: false, ...e },
+            { id: uid(), title: '', date: today(), time: null, kind: 'event', yearly: false, ...e },
             ...s.events,
           ],
         })),
       deleteEvent: (id) => set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
+      updateEvent: (id, patch) =>
+        set((s) => ({ events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+
+      // ---------- Life Command Center: focus blocks ----------
+      // "Follow the plan" turns the suggested blocks into calendar events of
+      // kind 'focus' (each linked to its task), marks the first task as in
+      // progress and mirrors the titles into today's plan pills.
+      applyPlan: (blocks) => {
+        const s = get();
+        const key = today();
+        blocks.forEach((b) =>
+          s.addEvent({ title: b.title, date: key, time: b.start, end: b.end, kind: 'focus', taskId: b.taskId })
+        );
+        const first = blocks[0] && s.tasks.find((t) => t.id === blocks[0].taskId);
+        if (first && first.status === 'todo') s.updateTask(first.id, { status: 'doing' });
+        if (blocks.length) s.addPlanItems(blocks.map((b) => b.title));
+      },
+      clearFocusBlocks: (date = today()) =>
+        set((s) => ({ events: s.events.filter((e) => !(e.kind === 'focus' && e.date === date)) })),
+
+      // ---------- MITH NOW: "What should I do now?" (see ai/mithNow.js) ----------
+      // nowLearn is what Boss's choices have taught the engine (persisted).
+      // nowSession is the focus sprint currently running from the Mith Now sheet.
+      nowLearn: emptyLearn(),
+      nowSession: null, // { taskId, title, eventId, startedAt, until: 'HH:mm', minutes }
+      nowStart: (rec) => {
+        const s = get();
+        const task = s.tasks.find((t) => t.id === rec.id);
+        if (!task) return null;
+        const now = dayjs();
+        const start = now.format('HH:mm');
+        const end = now.add(rec.minutes, 'minute').format('HH:mm');
+        // one focus block on today's calendar, linked to the task
+        s.clearNowSession();
+        s.addEvent({ title: task.title, date: today(), time: start, end, kind: 'focus', taskId: task.id });
+        const eventId = get().events[0]?.id ?? null;
+        if (task.status === 'todo') s.updateTask(task.id, { status: 'doing' });
+        const session = { taskId: task.id, title: task.title, eventId, startedAt: now.toISOString(), until: end, minutes: rec.minutes };
+        set((st) => ({ nowSession: session, nowLearn: learnStart(st.nowLearn, task, now) }));
+        return session;
+      },
+      nowSkip: (taskId) => {
+        const task = get().tasks.find((t) => t.id === taskId);
+        if (!task) return;
+        set((st) => ({ nowLearn: learnSkip(st.nowLearn, task, dayjs()) }));
+      },
+      // Done: the task completes, the real duration calibrates future estimates.
+      nowFinish: () => {
+        const s = get();
+        const sess = s.nowSession;
+        if (!sess) return;
+        const task = s.tasks.find((t) => t.id === sess.taskId);
+        const spent = Math.round(dayjs().diff(dayjs(sess.startedAt), 'minute'));
+        if (task && task.status !== 'done') s.completeTask(task.id);
+        if (sess.eventId) s.updateEvent(sess.eventId, { end: dayjs().format('HH:mm') });
+        set((st) => ({ nowSession: null, nowLearn: task ? learnFinish(st.nowLearn, task, spent) : st.nowLearn }));
+      },
+      // Stop early: the task stays open, the focus block shrinks to what was used.
+      clearNowSession: () => {
+        const sess = get().nowSession;
+        if (!sess) return;
+        if (sess.eventId) {
+          const spent = dayjs().diff(dayjs(sess.startedAt), 'minute');
+          if (spent < 3) get().deleteEvent(sess.eventId);
+          else get().updateEvent(sess.eventId, { end: dayjs().format('HH:mm') });
+        }
+        set({ nowSession: null });
+      },
+      resetNowLearn: () => set({ nowLearn: emptyLearn() }),
+
+      // ---------- automatic project creation (see ai/projectPlanner.js) ----------
+      // A sentence like "I need to launch my portfolio website next month" becomes
+      // a pending proposal — milestones and dated tasks — that the user reviews
+      // before anything is created. Session-only (excluded from persistence).
+      pendingProposal: null, // { text, intent, plan, ts }
+      proposeProject: (text, intent) => {
+        const plan = buildPlan(intent);
+        set({ pendingProposal: { text, intent, plan, ts: Date.now() } });
+        return plan;
+      },
+      discardProposal: () => set({ pendingProposal: null }),
+      // `plan` may be the edited version from the proposal sheet; `selected` a Set of plan task ids
+      createProposedProject: (plan = null, selected = null) => {
+        const pending = get().pendingProposal;
+        const chosen = plan ?? pending?.plan;
+        if (!chosen) return null;
+        const result = createProjectFromPlan(chosen, get(), selected);
+        set({ pendingProposal: null });
+        return result;
+      },
+
+      // ---------- Myth Planner (trips, events, study… see ai/planner.js) ----------
+      // One session per plan: draft → planned → confirmed → live → done.
+      plannerSessions: [],
+      addPlannerSession: (s) => {
+        const sess = {
+          id: uid(), created: new Date().toISOString(), status: 'draft', mode: 'generic', title: '',
+          input: {}, result: null, chosen: null, projectId: null, live: null, packingDone: [], chat: [], ...s,
+        };
+        set((st) => ({ plannerSessions: [sess, ...(st.plannerSessions ?? [])] }));
+        return sess;
+      },
+      updatePlannerSession: (id, patch) =>
+        set((st) => ({
+          plannerSessions: (st.plannerSessions ?? []).map((s) => (s.id === id ? { ...s, ...(typeof patch === 'function' ? patch(s) : patch) } : s)),
+        })),
+      deletePlannerSession: (id) => set((st) => ({ plannerSessions: (st.plannerSessions ?? []).filter((s) => s.id !== id) })),
 
       // ---------- assistant chat (sessions; history auto-deletes after 3 days) ----------
       chat: [],
@@ -287,9 +414,9 @@ export const useStore = create(
     }),
     {
       name: 'myth-db',
-      version: 5,
+      version: 7,
       // ask for the password on every visit — auth state is session-only
-      partialize: (s) => Object.fromEntries(Object.entries(s).filter(([k]) => k !== 'authed')),
+      partialize: (s) => Object.fromEntries(Object.entries(s).filter(([k]) => k !== 'authed' && k !== 'pendingProposal')),
       migrate: (persisted, version) => {
         if (version < 2 && persisted?.settings) {
           // v2: auto-select the best installed model instead of a hardcoded one
@@ -323,6 +450,34 @@ export const useStore = create(
           persisted.settings.cloudKey ??= '';
           persisted.settings.cloudUrl ??= '';
         }
+        if (version < 6 && persisted) {
+          // v6: one flow for everything — the work/personal split is gone.
+          // Plan keys lose their "|mode" suffix and items drop the stale mode field.
+          const strip = (arr) => (Array.isArray(arr) ? arr.map((x) => {
+            if (!x || typeof x !== 'object') return x;
+            const rest = { ...x };
+            delete rest.mode;
+            return rest;
+          }) : arr);
+          ['tasks', 'projects', 'notes', 'events', 'habits', 'files', 'journal', 'learning'].forEach((k) => { if (persisted[k]) persisted[k] = strip(persisted[k]); });
+          if (persisted.plans) {
+            const merged = {};
+            Object.entries(persisted.plans).forEach(([key, items]) => {
+              const k = key.split('|')[0];
+              merged[k] = [...(merged[k] ?? []), ...(items ?? [])];
+            });
+            persisted.plans = merged;
+          }
+          if (persisted.settings) delete persisted.settings.mode;
+        }
+        if (version < 7 && persisted) {
+          // v7: notification intelligence — delivery preferences and the snooze/dismiss map
+          persisted.settings ??= {};
+          persisted.settings.notifyBudget ??= 4;
+          persisted.settings.quietStart ??= 22;
+          persisted.settings.quietEnd ??= 7;
+          persisted.notifyMuted ??= {};
+        }
         return persisted;
       },
     }
@@ -330,7 +485,6 @@ export const useStore = create(
 );
 
 // selector helpers
-export const inMode = (items, mode) => items.filter((i) => i.mode === mode);
 export const levelFromXp = (points) => Math.floor(Math.sqrt(points / 40)) + 1;
 export const levelProgress = (points) => {
   const lvl = levelFromXp(points);

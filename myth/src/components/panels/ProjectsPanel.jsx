@@ -55,7 +55,7 @@ function ProjectDetail({ project, onBack }) {
     for (const file of list ?? []) {
       const id = uid();
       await putBlob(id, file);
-      addFileMeta({ id, name: file.name, size: file.size, type: file.type, projectId: project.id, mode: project.mode });
+      addFileMeta({ id, name: file.name, size: file.size, type: file.type, projectId: project.id });
     }
   };
 
@@ -167,7 +167,7 @@ function ProjectDetail({ project, onBack }) {
               value={quickTask} onChange={(e) => setQuickTask(e.currentTarget.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && quickTask.trim()) {
-                  addTask({ title: quickTask.trim(), projectId: project.id, mode: project.mode });
+                  addTask({ title: quickTask.trim(), projectId: project.id });
                   setQuickTask('');
                 }
               }}
@@ -191,12 +191,12 @@ function ProjectDetail({ project, onBack }) {
         <Tabs.Panel value="notes" pt="md">
           <Group mb="sm" gap="xs">
             <Button size="xs" radius="xl" variant="light" leftSection={<IconPlus size={14} />}
-              onClick={() => setEditNote(addNote({ title: 'New note', projectId: project.id, mode: project.mode }))}>
+              onClick={() => setEditNote(addNote({ title: 'New note', projectId: project.id }))}>
               Note
             </Button>
             <Button size="xs" radius="xl" variant="light" color="violet" leftSection={<IconPlus size={14} />}
               onClick={() => setEditNote(addNote({
-                title: 'New meeting', type: 'meeting', projectId: project.id, mode: project.mode,
+                title: 'New meeting', type: 'meeting', projectId: project.id,
                 meeting: { date: dayjs().format('YYYY-MM-DD'), time: '', participants: '', agenda: '', actions: '' },
               }))}>
               Meeting note
@@ -250,11 +250,11 @@ function ProjectDetail({ project, onBack }) {
 }
 
 export default function ProjectsPanel() {
-  const { projects, tasks, addProject, deleteProject, settings } = useStore();
+  const { projects, tasks, addProject, deleteProject } = useStore();
   const [openId, setOpenId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', desc: '', deadline: null, color: '#12a150' });
-  const mine = projects.filter((p) => p.mode === settings.mode);
+  const mine = projects;
   const open = mine.find((p) => p.id === openId);
 
   useEffect(() => { if (openId && !open) setOpenId(null); }, [openId, open]);
@@ -280,12 +280,12 @@ export default function ProjectsPanel() {
         radius="xl" leftSection={<IconPlus size={16} />} variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}
         onClick={() => setCreating(true)}
       >
-        New {settings.mode} project
+        New project
       </Button>
 
       <Modal
         opened={creating} onClose={() => setCreating(false)} radius="xl" centered
-        title={<Text fw={800} fz={18}>New {settings.mode} project</Text>}
+        title={<Text fw={800} fz={18}>New project</Text>}
       >
         <Stack gap="sm">
           <TextInput

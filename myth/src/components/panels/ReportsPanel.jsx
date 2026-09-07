@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  Stack, Group, Text, Box, Badge, SegmentedControl, ActionIcon, Button, Progress, SimpleGrid, RingProgress,
+  Stack, Group, Text, Box, Badge, ActionIcon, Button, Progress, SimpleGrid, RingProgress,
 } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight, IconRefresh, IconTrophy, IconBulb, IconCalendarStats, IconFlame, IconSparkles } from '@tabler/icons-react';
 import { BarChart, DonutChart } from '@mantine/charts';
@@ -54,7 +54,6 @@ function Counter({ target }) {
 
 export default function ReportsPanel() {
   const state = useStore();
-  const [mode, setMode] = useState(state.settings.mode);
   const [month, setMonth] = useState(dayjs().startOf('month'));
   const [regenKey, setRegenKey] = useState(0);
   const [aiText, setAiText] = useState(null);
@@ -62,17 +61,17 @@ export default function ReportsPanel() {
   const [aiBusy, setAiBusy] = useState(false);
 
   const stats = useMemo(
-    () => monthStats(state, mode, month.format('YYYY-MM-DD')),
+    () => monthStats(state, month.format('YYYY-MM-DD')),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.tasks, state.notes, state.transactions, state.habits, state.journal, mode, month, regenKey]
+    [state.tasks, state.notes, state.projects, state.transactions, state.habits, state.journal, month, regenKey]
   );
-  const story = narrative(stats, mode, 'Boss');
+  const story = narrative(stats, 'Boss');
 
   const writeWithAI = async () => {
     setAiBusy(true);
     setAiText('');
     try {
-      const result = await aiMonthReview(stats, mode, state, (t) => setAiText(t));
+      const result = await aiMonthReview(stats, state, (t) => setAiText(t));
       if (!result) {
         setAiText(null);
         notifications.show({
@@ -104,10 +103,6 @@ export default function ReportsPanel() {
           </ActionIcon>
         </Group>
         <Group gap="xs">
-          <SegmentedControl
-            value={mode} onChange={(v) => switchReport(() => setMode(v))} radius="xl" size="xs"
-            data={[{ value: 'work', label: 'Work' }, { value: 'personal', label: 'Personal' }]}
-          />
           <Button size="xs" radius="xl" variant="light" leftSection={<IconRefresh size={14} />} onClick={() => switchReport(() => setRegenKey((k) => k + 1))}>
             Regenerate
           </Button>
@@ -121,7 +116,7 @@ export default function ReportsPanel() {
       </Group>
 
       <AnimatePresence mode="wait">
-        <motion.div key={`${mode}${month}${regenKey}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div key={`${month}${regenKey}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <Stack gap="lg">
             {/* Narrative */}
             <motion.div {...rise(0)}>
@@ -197,52 +192,48 @@ export default function ReportsPanel() {
               </motion.div>
             )}
 
-            {/* Personal extras */}
-            {mode === 'personal' && (
-              <>
-                {(stats.spent > 0 || stats.earned > 0) && (
-                  <motion.div {...rise(4)}>
-                    <Box className="glass" p="lg" style={{ borderRadius: 20 }}>
-                      <Text fw={700} fz={14} mb="sm">Money flow</Text>
-                      <Group align="center" gap="xl" wrap="wrap">
-                        {stats.expenseByCategory.length > 0 && (
-                          <DonutChart
-                            size={150} thickness={24} withTooltip
-                            data={stats.expenseByCategory.map((c, i) => ({ ...c, color: COLORS[i % COLORS.length] }))}
-                          />
-                        )}
-                        <Stack gap={6}>
-                          <Text fz={14}>Earned <b style={{ color: '#0b7a3e' }}>₹{stats.earned.toLocaleString('en-IN')}</b></Text>
-                          <Text fz={14}>Spent <b style={{ color: '#c92a2a' }}>₹{stats.spent.toLocaleString('en-IN')}</b></Text>
-                          <Text fz={14}>{stats.savings >= 0 ? 'Saved' : 'Overspent'} <b>₹{Math.abs(stats.savings).toLocaleString('en-IN')}</b></Text>
-                        </Stack>
-                      </Group>
-                    </Box>
-                  </motion.div>
-                )}
-                {stats.habitStats?.length > 0 && (
-                  <motion.div {...rise(5)}>
-                    <Box className="glass" p="lg" style={{ borderRadius: 20 }}>
-                      <Group gap={8} mb="sm"><IconFlame size={17} color="#e8590c" /><Text fw={700} fz={14}>Habit consistency — {stats.habitConsistency}%</Text></Group>
-                      <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
-                        {stats.habitStats.map((h, i) => {
-                          const HIcon = habitIcon(h.icon);
-                          return (
-                            <motion.div key={h.name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 + i * 0.1 }}>
-                              <Group gap={8} wrap="nowrap">
-                                <RingProgress size={52} thickness={6} roundCaps sections={[{ value: h.pct, color: h.pct >= 60 ? '#12a150' : '#f08c00' }]}
-                                  label={<Text ta="center" fz={10} fw={700}>{h.pct}%</Text>} />
-                                <HIcon size={15} color="#0f766e" style={{ flexShrink: 0 }} />
-                                <Text fz={12.5}>{h.name}</Text>
-                              </Group>
-                            </motion.div>
-                          );
-                        })}
-                      </SimpleGrid>
-                    </Box>
-                  </motion.div>
-                )}
-              </>
+            {/* Money & habits — same month, one flow */}
+            {(stats.spent > 0 || stats.earned > 0) && (
+              <motion.div {...rise(4)}>
+                <Box className="glass" p="lg" style={{ borderRadius: 20 }}>
+                  <Text fw={700} fz={14} mb="sm">Money flow</Text>
+                  <Group align="center" gap="xl" wrap="wrap">
+                    {stats.expenseByCategory.length > 0 && (
+                      <DonutChart
+                        size={150} thickness={24} withTooltip
+                        data={stats.expenseByCategory.map((c, i) => ({ ...c, color: COLORS[i % COLORS.length] }))}
+                      />
+                    )}
+                    <Stack gap={6}>
+                      <Text fz={14}>Earned <b style={{ color: '#0b7a3e' }}>₹{stats.earned.toLocaleString('en-IN')}</b></Text>
+                      <Text fz={14}>Spent <b style={{ color: '#c92a2a' }}>₹{stats.spent.toLocaleString('en-IN')}</b></Text>
+                      <Text fz={14}>{stats.savings >= 0 ? 'Saved' : 'Overspent'} <b>₹{Math.abs(stats.savings).toLocaleString('en-IN')}</b></Text>
+                    </Stack>
+                  </Group>
+                </Box>
+              </motion.div>
+            )}
+            {stats.habitStats?.length > 0 && (
+              <motion.div {...rise(5)}>
+                <Box className="glass" p="lg" style={{ borderRadius: 20 }}>
+                  <Group gap={8} mb="sm"><IconFlame size={17} color="#e8590c" /><Text fw={700} fz={14}>Habit consistency — {stats.habitConsistency}%</Text></Group>
+                  <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
+                    {stats.habitStats.map((h, i) => {
+                      const HIcon = habitIcon(h.icon);
+                      return (
+                        <motion.div key={h.name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 + i * 0.1 }}>
+                          <Group gap={8} wrap="nowrap">
+                            <RingProgress size={52} thickness={6} roundCaps sections={[{ value: h.pct, color: h.pct >= 60 ? '#12a150' : '#f08c00' }]}
+                              label={<Text ta="center" fz={10} fw={700}>{h.pct}%</Text>} />
+                            <HIcon size={15} color="#0f766e" style={{ flexShrink: 0 }} />
+                            <Text fz={12.5}>{h.name}</Text>
+                          </Group>
+                        </motion.div>
+                      );
+                    })}
+                  </SimpleGrid>
+                </Box>
+              </motion.div>
             )}
 
             {/* Top wins */}

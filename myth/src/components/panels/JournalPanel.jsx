@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Stack, Group, Text, Box, Textarea, Badge, Button, ActionIcon, ThemeIcon, Tooltip } from '@mantine/core';
+import { Stack, Group, Text, Box, Textarea, Button, ActionIcon, ThemeIcon, Tooltip } from '@mantine/core';
 import { IconMoodHappy, IconMoodSmile, IconMoodEmpty, IconMoodSad, IconTrash, IconSparkles } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
@@ -17,7 +17,7 @@ const MOODS = [
 const moodOf = (v) => MOODS.find((m) => m.value === v) ?? (v >= 4 ? MOODS[1] : MOODS[2]);
 
 export default function JournalPanel() {
-  const { journal, addJournalEntry, deleteJournalEntry, settings, tasks, habits } = useStore();
+  const { journal, addJournalEntry, deleteJournalEntry, tasks, habits } = useStore();
   const [text, setText] = useState('');
   const [mood, setMood] = useState(4);
   const [drafting, setDrafting] = useState(false);
@@ -47,7 +47,7 @@ export default function JournalPanel() {
         onToken: (t) => setText(t),
         messages: [
           { role: 'system', content: 'Write a 2-3 sentence first-person daily journal recap. Warm, honest, plain text, no emojis, no lists.' },
-          { role: 'user', content: `Draft my recap for today. Completed tasks: ${done.join('; ') || 'none'}. Habits kept: ${kept.join('; ') || 'none'}. Mode: ${settings.mode}.` },
+          { role: 'user', content: `Draft my recap for today. Completed tasks: ${done.join('; ') || 'none'}. Habits kept: ${kept.join('; ') || 'none'}.` },
         ],
       });
       setText(draft.trim());
@@ -122,9 +122,6 @@ export default function JournalPanel() {
                       {dayjs(j.date).format('D MMM')} · {m.label}
                     </Text>
                     <Group gap={6}>
-                      <Badge size="sm" variant="light" color={(j.mode ?? 'personal') === 'work' ? 'blue' : 'orange'}>
-                        {(j.mode ?? 'personal') === 'work' ? 'Office' : 'Personal'}
-                      </Badge>
                       <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => deleteJournalEntry(j.id)}>
                         <IconTrash size={13} />
                       </ActionIcon>

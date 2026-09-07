@@ -10,16 +10,20 @@ import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
 import { parseMulti, executeCapture } from '../ai/parser';
 import { askAssistant } from '../ai/assistant';
+import { detectProjectIntent } from '../ai/projectPlanner';
 import DayPlan from './DayPlan';
 
 const CHAT_HINTS = [
+  'What should I do now?',
+  "Prepare me for tomorrow's meeting",
+  'What should I handle today?',
   'What are my priorities today?',
   "What's overdue?",
   'Generate my monthly report',
 ];
 
 // Clear question phrasing — even in Plan mode this deserves an answer, not a task.
-const QUESTION = /^(what|how|which|when|who|why|where|can|could|should|would|is|are|am|do|does|did|tell|explain|show|hi|hey|hello|thanks|thank)\b|\?$/i;
+const QUESTION = /^(what|how|which|when|who|why|where|can|could|should|would|is|are|am|do|does|did|tell|explain|show|hi|hey|hello|thanks|thank)\b|^(?:prep(?:are)?\s+me|brief\s+me|get\s+me\s+ready)\b|^(?:follow|apply|accept|go with|clear|cancel|drop)\s+(?:the\s+|your\s+|my\s+|myth'?s?\s+|today'?s?\s+)?(?:plan|focus blocks?)\b|\?$/i;
 
 export default function CaptureBar({ onExpand, onChatOpen }) {
   const [value, setValue] = useState('');
@@ -32,8 +36,8 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
   const recRef = useRef(null);
   const scrollRef = useRef(null);
 
-  const mode = useStore((s) => s.settings.mode);
   const projects = useStore((s) => s.projects);
+  const proposeProject = useStore((s) => s.proposeProject);
   const chat = useStore((s) => s.chat);
   const chatHistory = useStore((s) => s.chatHistory);
   const pushChat = useStore((s) => s.pushChat);
@@ -91,8 +95,18 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
     // chatbot mode, or clear question phrasing → the assistant
     if (chatMode || QUESTION.test(t)) { ask(t); return; }
 
+    // "I need to launch my portfolio website next month" → a proposed project
+    // (milestones + tasks) to review — never thirty silent tasks
+    const intent = detectProjectIntent(t);
+    if (intent) {
+      proposeProject(t, intent);
+      setLastResult({ count: 1, msgs: [`Drafted a project plan for "${intent.name}" — nothing is created until you confirm`] });
+      setTimeout(() => setLastResult(null), 5000);
+      return;
+    }
+
     // Plan mode: split the sentence and route every piece to its feature
-    const items = parseMulti(t, mode, projects);
+    const items = parseMulti(t, projects);
     if (!items.length) { ask(t); return; } // nothing capturable — let the bot handle it
 
     const msgs = items.map((parsed) => executeCapture(parsed, useStore));

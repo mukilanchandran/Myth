@@ -10,6 +10,7 @@ import {
 import { detectAI, streamChat, pickModel, OLLAMA_DEFAULT } from '../../ai/ollama';
 import { PROVIDERS, providerFor } from '../../ai/providers';
 import * as cloud from '../../cloud/netlify';
+import NotificationPrefs from './NotificationPrefs';
 
 function NotificationSection({ settings, setSettings }) {
   const enabled = settings.notifications;
@@ -456,6 +457,7 @@ export default function SettingsPanel() {
       </Box>
 
       <NotificationSection settings={settings} setSettings={setSettings} />
+      <NotificationPrefs settings={settings} setSettings={setSettings} />
 
       <Box className="glass" p="md" style={{ borderRadius: 16 }}>
         <Group justify="space-between" mb={4}>

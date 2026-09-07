@@ -11,6 +11,8 @@
 // Optional:
 //   PUSH_TZ_OFFSET_MIN                   — minutes from UTC, default 330 (IST)
 import webpush from 'web-push';
+import dayjs from 'dayjs';
+import { smartNotifications, isMuted, composeDigest } from '../../src/ai/notifications.js';
 import { syncKeys, namespaceFor } from './auth.mjs';
 import { readIndex, writeIndex, readBackupState } from './store.mjs';
 
@@ -34,54 +36,17 @@ function configureVapid() {
 /** "Now" in the user's timezone, read through getUTC* accessors. */
 const localNow = () => new Date(Date.now() + TZ_OFFSET_MIN * 60_000);
 
-// ---- reminder rules (mirror of src/notify.js pendingReminders) ----
+// ---- what to say: the Notification Intelligence Engine, shared with the app ----
+// `now` is already shifted into the user's timezone (localNow), so wrapping it in
+// dayjs on a UTC server yields the user's local hours and dates. Returns the
+// notifications worth a lock screen, most important first, minus muted ones.
 export function computeReminders(state, now = localNow()) {
-  const out = [];
-  if (!state || state.settings?.notifications === false) return out;
-
-  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const hour = now.getUTCHours();
-  const dayDiff = (iso) => {
-    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-    return Math.round((Date.UTC(y, m - 1, d) - todayUTC) / 86_400_000);
-  };
-  const fmt = (iso) => {
-    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-  };
-
-  for (const t of state.tasks ?? []) {
-    if (t.status === 'done' || !t.due) continue;
-    const diff = dayDiff(t.due);
-    if (diff < 0) out.push(`Overdue: ${t.title} (${fmt(t.due)})`);
-    else if (diff === 0) out.push(`Due today: ${t.title}`);
-    else if (diff === 1) out.push(`Due tomorrow: ${t.title}`);
-  }
-
-  for (const e of state.events ?? []) {
-    if (!e.date) continue;
-    let diff = dayDiff(e.date);
-    if (e.yearly) {
-      // birthdays/anniversaries recur — roll into this or next year
-      const [, m, d] = e.date.slice(0, 10).split('-').map(Number);
-      let target = Date.UTC(now.getUTCFullYear(), m - 1, d);
-      if (target < todayUTC) target = Date.UTC(now.getUTCFullYear() + 1, m - 1, d);
-      diff = Math.round((target - todayUTC) / 86_400_000);
-    }
-    if (diff >= 0 && diff <= 3) {
-      const when = diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : `in ${diff} days`;
-      out.push(`${e.title} — ${when}${e.time ? ` ${e.time}` : ''}`);
-    }
-  }
-
-  // habit nudge only in the evening run
-  if (hour >= 17) {
-    const key = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
-    const missed = (state.habits ?? []).filter((h) => !h.log?.[key]).length;
-    if (missed > 0) out.push(`${missed} habit${missed > 1 ? 's' : ''} still open today`);
-  }
-
-  return out.slice(0, 6);
+  if (!state || state.settings?.notifications === false) return [];
+  const at = dayjs(now);
+  return smartNotifications(state, at)
+    .filter((n) => !isMuted(n, state.notifyMuted, at))
+    .filter((n) => n.level !== 'fyi')
+    .slice(0, 4);
 }
 
 /**
@@ -126,9 +91,10 @@ export async function runDigest(store, { label = 'digest' } = {}) {
     const reminders = computeReminders(backup?.state, now);
     if (!reminders.length) { totals.skipped++; continue; }
 
+    const digest = composeDigest(reminders, greeting);
     const payload = {
-      title: `Myth — good ${greeting}, Boss`,
-      body: reminders.map((r) => `• ${r}`).join('\n'),
+      title: digest.title,
+      body: digest.body,
       tag: `myth-${label}-${now.toISOString().slice(0, 10)}-${greeting}`,
       url: './',
     };

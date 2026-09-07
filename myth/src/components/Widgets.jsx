@@ -1,5 +1,5 @@
-import { Box, Group, Text, Stack, Progress, Badge, Checkbox, RingProgress, SimpleGrid, ThemeIcon } from '@mantine/core';
-import { IconArrowUpRight, IconCalendarEvent, IconTargetArrow, IconWallet, IconFolders, IconChartDonut } from '@tabler/icons-react';
+import { Box, Group, Text, Stack, Progress, Badge, Checkbox, RingProgress, SimpleGrid } from '@mantine/core';
+import { IconArrowUpRight, IconCalendarEvent, IconTargetArrow, IconWallet, IconFolders, IconRepeat } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
@@ -35,12 +35,12 @@ function WidgetCard({ children, i, onClick, title, icon }) {
   );
 }
 
+// One flow: tasks, projects, habits and money all sit on the landing page together.
 export default function Widgets({ onOpen }) {
   const state = useStore();
-  const mode = state.settings.mode;
   const todayKey = dayjs().format('YYYY-MM-DD');
 
-  const tasks = state.tasks.filter((t) => t.mode === mode && t.status !== 'done');
+  const tasks = state.tasks.filter((t) => t.status !== 'done');
   const dueToday = tasks.filter((t) => t.due && dayjs(t.due).isSame(dayjs(), 'day'));
   const overdue = tasks.filter((t) => t.due && dayjs(t.due).isBefore(dayjs(), 'day'));
   // urgency order: overdue → today → everything else by (due date, priority)
@@ -49,8 +49,9 @@ export default function Widgets({ onOpen }) {
     .sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || b.priority - a.priority);
   const focus = [...overdue, ...dueToday, ...rest].slice(0, 3);
 
-  const stats = monthStats(state, mode, todayKey);
-  const projects = state.projects.filter((p) => p.mode === mode && p.status === 'active');
+  const stats = monthStats(state, todayKey);
+  const projects = state.projects.filter((p) => p.status === 'active');
+  const habitsDone = state.habits.filter((h) => h.log[todayKey]).length;
 
   const upcoming = state.events
     .map((e) => {
@@ -63,12 +64,17 @@ export default function Widgets({ onOpen }) {
     .sort((a, b) => a.next - b.next)
     .slice(0, 3);
 
-  const monthTx = state.transactions.filter((t) => dayjs(t.date).isSame(dayjs(), 'month'));
-  const spent = monthTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
-  const earned = monthTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
+  const hasMoney = stats.earned > 0 || stats.spent > 0;
 
   return (
-    <SimpleGrid className="widget-grid" cols={{ base: 1, sm: 2, lg: 4 }} spacing="md" w="100%" maw={1240} mx="auto" px={{ base: 12, sm: 24 }}>
+    // container queries: the column count follows the space actually available,
+    // so the grid stays tidy when the side drawer narrows the page
+    <SimpleGrid
+      type="container"
+      className="widget-grid"
+      cols={{ base: 1, '520px': 2, '780px': 3, '1040px': 5 }}
+      spacing="md" w="100%" maw={1400} mx="auto" px={{ base: 12, sm: 24 }}
+    >
       {/* Focus today */}
       <WidgetCard i={0} title="Focus today" icon={<IconTargetArrow size={17} color="#12a150" />} onClick={() => onOpen('tasks')}>
         {focus.length === 0 ? (
@@ -90,7 +96,7 @@ export default function Widgets({ onOpen }) {
         )}
       </WidgetCard>
 
-      {/* Month progress */}
+      {/* Month progress + money */}
       <WidgetCard i={1} title={`${dayjs().format('MMMM')} progress`} icon={<IconTargetArrow size={17} color="#1971c2" />} onClick={() => onOpen('reports')}>
         <Group gap="lg" align="center">
           <RingProgress
@@ -104,56 +110,71 @@ export default function Widgets({ onOpen }) {
             <Text fz={13} c={stats.overdue ? 'red' : 'dimmed'}><b>{stats.overdue}</b> overdue</Text>
           </Stack>
         </Group>
+        {hasMoney && (
+          <Group
+            gap={8} mt={10} pt={8} wrap="nowrap"
+            style={{ borderTop: '1px solid rgba(20,60,40,0.12)' }}
+            onClick={(e) => { e.stopPropagation(); onOpen('finance'); }}
+          >
+            <IconWallet size={15} color="#0f766e" style={{ flexShrink: 0 }} />
+            <Text fz={12.5} fw={600}>₹{stats.spent.toLocaleString('en-IN')} spent</Text>
+            <Text fz={12.5} c={stats.savings >= 0 ? 'green' : 'red'}>
+              net {stats.savings >= 0 ? '+' : '−'}₹{Math.abs(stats.savings).toLocaleString('en-IN')}
+            </Text>
+          </Group>
+        )}
       </WidgetCard>
 
-      {/* Mode specific: projects (work) or habits (personal) */}
-      {mode === 'work' ? (
-        <WidgetCard i={2} title="Active projects" icon={<IconFolders size={17} color="#e8590c" />} onClick={() => onOpen('projects')}>
-          {projects.length === 0 ? (
-            <Text fz={13} c="dimmed">No projects yet — create one to organise docs, notes & meetings.</Text>
-          ) : (
-            <Stack gap={10}>
-              {projects.slice(0, 3).map((p) => {
-                const pt = state.tasks.filter((t) => t.projectId === p.id);
-                const pct = pt.length ? Math.round((pt.filter((t) => t.status === 'done').length / pt.length) * 100) : 0;
-                return (
-                  <div key={p.id}>
-                    <Group justify="space-between" mb={3}>
-                      <Text fz={13} fw={600} lineClamp={1}>{p.name}</Text>
-                      <Text fz={12} c="dimmed">{pct}%</Text>
-                    </Group>
-                    <Progress value={pct} size={6} radius="xl" color={p.color} />
-                  </div>
-                );
-              })}
-            </Stack>
-          )}
-        </WidgetCard>
-      ) : (
-        <WidgetCard i={2} title="Today's habits" icon={<IconTargetArrow size={17} color="#e8590c" />} onClick={() => onOpen('habits')}>
-          {state.habits.length === 0 ? (
-            <Text fz={13} c="dimmed">Type "habit: read 20 min" above to start one.</Text>
-          ) : (
-            <Stack gap={7}>
-              {state.habits.slice(0, 3).map((h) => {
-                const HIcon = habitIcon(h.icon);
-                return (
-                  <Group key={h.id} gap={8} onClick={(e) => e.stopPropagation()} wrap="nowrap">
-                    <Checkbox size="xs" radius="xl" color="forest" checked={!!h.log[todayKey]} onChange={() => state.toggleHabit(h.id)} />
-                    <HIcon size={15} color="#0f766e" style={{ flexShrink: 0 }} />
-                    <Text fz={13.5} td={h.log[todayKey] ? 'line-through' : undefined} opacity={h.log[todayKey] ? 0.6 : 1}>
-                      {h.name}
-                    </Text>
+      {/* Active projects */}
+      <WidgetCard i={2} title="Active projects" icon={<IconFolders size={17} color="#e8590c" />} onClick={() => onOpen('projects')}>
+        {projects.length === 0 ? (
+          <Text fz={13} c="dimmed">No projects yet — create one to organise docs, notes & meetings.</Text>
+        ) : (
+          <Stack gap={10}>
+            {projects.slice(0, 3).map((p) => {
+              const pt = state.tasks.filter((t) => t.projectId === p.id);
+              const pct = pt.length ? Math.round((pt.filter((t) => t.status === 'done').length / pt.length) * 100) : 0;
+              return (
+                <div key={p.id}>
+                  <Group justify="space-between" mb={3}>
+                    <Text fz={13} fw={600} lineClamp={1}>{p.name}</Text>
+                    <Text fz={12} c="dimmed">{pct}%</Text>
                   </Group>
-                );
-              })}
-            </Stack>
-          )}
-        </WidgetCard>
-      )}
+                  <Progress value={pct} size={6} radius="xl" color={p.color} />
+                </div>
+              );
+            })}
+          </Stack>
+        )}
+      </WidgetCard>
 
-      {/* Upcoming + money strip */}
-      <WidgetCard i={3} title="Coming up" icon={<IconCalendarEvent size={17} color="#7048e8" />} onClick={() => onOpen('calendar')}>
+      {/* Today's habits */}
+      <WidgetCard i={3} title="Today's habits" icon={<IconRepeat size={17} color="#0ca678" />} onClick={() => onOpen('habits')}>
+        {state.habits.length === 0 ? (
+          <Text fz={13} c="dimmed">Type "habit: read 20 min" above to start one.</Text>
+        ) : (
+          <Stack gap={7}>
+            {state.habits.slice(0, 3).map((h) => {
+              const HIcon = habitIcon(h.icon);
+              return (
+                <Group key={h.id} gap={8} onClick={(e) => e.stopPropagation()} wrap="nowrap">
+                  <Checkbox size="xs" radius="xl" color="forest" checked={!!h.log[todayKey]} onChange={() => state.toggleHabit(h.id)} />
+                  <HIcon size={15} color="#0f766e" style={{ flexShrink: 0 }} />
+                  <Text fz={13.5} lineClamp={1} td={h.log[todayKey] ? 'line-through' : undefined} opacity={h.log[todayKey] ? 0.6 : 1}>
+                    {h.name}
+                  </Text>
+                </Group>
+              );
+            })}
+            {state.habits.length > 3 && (
+              <Text fz={12} c="dimmed">{habitsDone}/{state.habits.length} kept today · {state.habits.length - 3} more inside</Text>
+            )}
+          </Stack>
+        )}
+      </WidgetCard>
+
+      {/* Coming up */}
+      <WidgetCard i={4} title="Coming up" icon={<IconCalendarEvent size={17} color="#7048e8" />} onClick={() => onOpen('calendar')}>
         <Stack gap={7}>
           {upcoming.length === 0 && <Text fz={13} c="dimmed">Calendar is clear.</Text>}
           {upcoming.map((e) => {
@@ -172,13 +193,6 @@ export default function Widgets({ onOpen }) {
               </Group>
             );
           })}
-          {mode === 'personal' && (earned > 0 || spent > 0) && (
-            <Group gap={8} mt={4} pt={8} style={{ borderTop: '1px solid rgba(20,60,40,0.12)' }}>
-              <IconWallet size={15} color="#0f766e" />
-              <Text fz={12.5} fw={600}>₹{spent.toLocaleString('en-IN')} spent</Text>
-              <Text fz={12.5} c="dimmed">of ₹{earned.toLocaleString('en-IN')}</Text>
-            </Group>
-          )}
         </Stack>
       </WidgetCard>
     </SimpleGrid>

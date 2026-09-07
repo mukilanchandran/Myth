@@ -77,7 +77,7 @@ function TaskRow({ task }) {
             />
             <Select
               size="xs" radius="md" placeholder="Project" clearable
-              data={projects.filter((p) => p.mode === task.mode).map((p) => ({ value: p.id, label: p.name }))}
+              data={projects.map((p) => ({ value: p.id, label: p.name }))}
               value={task.projectId}
               onChange={(v) => updateTask(task.id, { projectId: v })}
             />
@@ -93,11 +93,11 @@ function TaskRow({ task }) {
 }
 
 export default function TasksPanel() {
-  const { tasks, addTask, settings } = useStore();
+  const { tasks, addTask } = useStore();
   const [filter, setFilter] = useState('open');
   const [quick, setQuick] = useState('');
 
-  const mine = tasks.filter((t) => t.mode === settings.mode);
+  const mine = tasks;
   const shown = mine
     .filter((t) => (filter === 'open' ? t.status !== 'done' : filter === 'done' ? t.status === 'done' : true))
     .sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || b.priority - a.priority);

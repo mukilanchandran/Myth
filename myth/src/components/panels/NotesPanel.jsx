@@ -102,13 +102,12 @@ export function NoteEditor({ note, onClose }) {
 }
 
 export default function NotesPanel() {
-  const { notes, addNote, updateNote, settings, projects } = useStore();
+  const { notes, addNote, updateNote, projects } = useStore();
   const [tab, setTab] = useState('all');
   const [editId, setEditId] = useState(null);
   const [quick, setQuick] = useState('');
 
   const mine = notes
-    .filter((n) => n.mode === settings.mode)
     .filter((n) => tab === 'all' || n.type === tab)
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated.localeCompare(a.updated));
 

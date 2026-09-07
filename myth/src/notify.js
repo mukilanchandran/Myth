@@ -1,41 +1,16 @@
-// Smart reminders: computed from live data + pushed as browser notifications.
-// Each reminder carries a `kind` that the UI resolves to a design-system icon.
+// Notifications: the Notification Intelligence Engine (src/ai/notifications.js)
+// decides what is worth saying and when; this module only delivers it — the
+// bell, the app-icon badge, lock-screen notifications through the service
+// worker, and background-push registration.
 import dayjs from 'dayjs';
 import { notifications } from '@mantine/notifications';
 import { APP_NAME, asset } from './config/env';
 import * as cloud from './cloud/netlify';
+import { visibleNotifications, selectForDelivery, composeDigest, prefsOf } from './ai/notifications.js';
 
-export function pendingReminders(state) {
-  const out = [];
-  const t = dayjs();
-  const mode = state.settings.mode;
-
-  state.tasks
-    .filter((x) => x.mode === mode && x.status !== 'done' && x.due)
-    .forEach((x) => {
-      const diff = dayjs(x.due).startOf('day').diff(t.startOf('day'), 'day');
-      if (diff < 0) out.push({ kind: 'overdue', text: `Overdue: ${x.title} (${dayjs(x.due).format('MMM D')})` });
-      else if (diff === 0) out.push({ kind: 'today', text: `Due today: ${x.title}` });
-      else if (diff === 1) out.push({ kind: 'soon', text: `Due tomorrow: ${x.title}` });
-    });
-
-  state.events.forEach((e) => {
-    let d = dayjs(e.date);
-    if (e.yearly) d = d.year(t.year()).isBefore(t, 'day') ? d.year(t.year() + 1) : d.year(t.year());
-    const diff = d.startOf('day').diff(t.startOf('day'), 'day');
-    if (diff >= 0 && diff <= 3) {
-      out.push({ kind: e.kind ?? 'event', text: `${e.title} — ${diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : `in ${diff} days`}${e.time ? ` ${e.time}` : ''}` });
-    }
-  });
-
-  // habit nudge in the evening
-  if (t.hour() >= 18 && state.settings.mode === 'personal') {
-    const todayKey = t.format('YYYY-MM-DD');
-    const missed = state.habits.filter((h) => !h.log[todayKey]);
-    if (missed.length) out.push({ kind: 'habit', text: `${missed.length} habit${missed.length > 1 ? 's' : ''} still open today` });
-  }
-
-  return out.slice(0, 12);
+// What the bell shows: everything the engine has a reason for, minus snoozed and dismissed items.
+export function pendingReminders(state, now = dayjs()) {
+  return visibleNotifications(state, now);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +57,7 @@ export async function enableNotifications() {
   }
   const perm = status === 'granted' ? 'granted' : await Notification.requestPermission();
   if (perm !== 'granted') return { ok: false, reason: 'Permission was not granted.' };
-  await showSystemNotification(`${APP_NAME} 🔔`, 'Notifications are on — reminders will now reach you like a regular app.');
+  await showSystemNotification(`${APP_NAME} 🔔`, 'Notifications are on — Myth will only interrupt you when it can say why.');
   return { ok: true };
 }
 
@@ -127,7 +102,7 @@ export async function disableBackgroundPush(settings) {
   await sub.unsubscribe();
 }
 
-// Red badge on the home-screen icon with the number of pending reminders.
+// Red badge on the home-screen icon with the number of things that need a decision.
 export function updateAppBadge(count) {
   try {
     if (count > 0) navigator.setAppBadge?.(count);
@@ -135,53 +110,56 @@ export function updateAppBadge(count) {
   } catch { /* not supported — fine */ }
 }
 
-// ---- reminder push loop (runs while the app is open) ----
-// Each reminder fires as a real notification once per day; the icon badge
-// stays in sync. Survives re-renders via localStorage dedupe.
-const SENT_KEY = 'myth-notified';
+// ---- delivery loop (runs while the app is open) ----
+// The engine's delivery policy decides what may interrupt: quiet hours, the
+// daily budget, at most two per check, and never the same situation twice
+// unless it changed or got worse. The per-device log lives in localStorage
+// and keeps a week.
+const LOG_KEY = 'myth-notify-log';
+const LOG_DAYS = 7;
+
+export function readDeliveryLog() {
+  try {
+    const log = JSON.parse(localStorage.getItem(LOG_KEY)) ?? [];
+    const cutoff = Date.now() - LOG_DAYS * 86_400_000;
+    return Array.isArray(log) ? log.filter((l) => l && l.ts >= cutoff) : [];
+  } catch { return []; }
+}
+
+const writeDeliveryLog = (log) => {
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(-200))); } catch { /* storage blocked — fine */ }
+};
 
 export function runReminderNotifications(state) {
-  if (!state.settings.notifications) return;
-  const reminders = pendingReminders(state);
-  updateAppBadge(reminders.length);
-  if (notifyStatus() !== 'granted' || !reminders.length) return;
+  if (!state.settings.notifications) { updateAppBadge(0); return []; }
+  const now = dayjs();
+  const visible = visibleNotifications(state, now);
+  updateAppBadge(visible.filter((n) => n.level !== 'fyi').length);
+  if (notifyStatus() !== 'granted' || !visible.length) return [];
 
-  const today = dayjs().format('YYYY-MM-DD');
-  let sent;
-  try { sent = JSON.parse(localStorage.getItem(SENT_KEY)) ?? {}; } catch { sent = {}; }
-  if (sent.date !== today) sent = { date: today, keys: [] };
-
-  const fresh = reminders.filter((r) => !sent.keys.includes(r.text));
-  if (!fresh.length) return;
-
-  if (fresh.length === 1) {
-    showSystemNotification(APP_NAME, fresh[0].text, `myth-${today}-${sent.keys.length}`);
-  } else {
-    showSystemNotification(
-      `${APP_NAME} — ${fresh.length} reminders`,
-      fresh.slice(0, 5).map((r) => `• ${r.text}`).join('\n'),
-      `myth-${today}-${sent.keys.length}`
-    );
+  const log = readDeliveryLog();
+  const picked = selectForDelivery(visible, log, now, prefsOf(state.settings));
+  picked.forEach((n) => showSystemNotification(n.headline, n.lines.join('\n'), `myth-${n.key}`));
+  if (picked.length) {
+    writeDeliveryLog([...log, ...picked.map((n) => ({ key: n.key, fp: n.fp, level: n.level, ts: now.valueOf() }))]);
   }
-  sent.keys.push(...fresh.map((r) => r.text));
-  localStorage.setItem(SENT_KEY, JSON.stringify(sent));
+  return picked;
 }
 
 let lastDigest = null;
 
+// In-app greeting toast, once per day, led by the top item and its reasoning.
 export function runDailyDigest(state) {
   if (!state.settings.notifications) return;
-  const key = dayjs().format('YYYY-MM-DD') + state.settings.mode;
+  const key = dayjs().format('YYYY-MM-DD');
   if (lastDigest === key) return;
   lastDigest = key;
 
-  const reminders = pendingReminders(state);
-  if (!reminders.length) return;
-
-  notifications.show({
-    title: `Good ${dayjs().hour() < 12 ? 'morning' : dayjs().hour() < 17 ? 'afternoon' : 'evening'}, Boss`,
-    message: reminders.slice(0, 4).map((r) => `• ${r.text}`).join('\n'),
-    color: 'forest',
-    autoClose: 9000,
-  });
+  const h = dayjs().hour();
+  const digest = composeDigest(
+    visibleNotifications(state).filter((n) => n.level !== 'fyi'),
+    h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening',
+  );
+  if (!digest) return;
+  notifications.show({ title: digest.title, message: digest.body, color: 'forest', autoClose: 9000 });
 }

@@ -1,13 +1,14 @@
-import { Box, Group, Tooltip, ActionIcon, Text } from '@mantine/core';
+import { Box, Group, Tooltip, ActionIcon } from '@mantine/core';
 import {
   IconLayoutDashboard, IconChecklist, IconFolders, IconNotes,
   IconCalendarMonth, IconChartAreaLine,
-  IconWallet, IconRepeat, IconSchool, IconCloudLock,
+  IconWallet, IconRepeat, IconSchool, IconCloudLock, IconBrain, IconCompass,
 } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 
 const ITEMS = [
   { key: 'today', label: 'Daily planner', icon: IconLayoutDashboard },
+  { key: 'context', label: 'Context engine — meeting prep & connections', icon: IconBrain },
   { key: 'tasks', label: 'Tasks', icon: IconChecklist },
   { key: 'projects', label: 'Projects', icon: IconFolders },
   { key: 'notes', label: 'Notes & Ideas', icon: IconNotes },
@@ -17,6 +18,7 @@ const ITEMS = [
   { key: 'finance', label: 'Finance', icon: IconWallet },
   { key: 'calendar', label: 'Calendar', icon: IconCalendarMonth },
   { key: 'reports', label: 'Monthly report', icon: IconChartAreaLine },
+  { key: 'planner', label: 'Myth Planner — trips, events, exams, launches', icon: IconCompass },
 ];
 
 export default function Dock({ onOpen, active, shift = 0 }) {

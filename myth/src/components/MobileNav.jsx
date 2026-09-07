@@ -7,7 +7,7 @@ import {
   IconLayoutDashboard, IconChecklist, IconFolders, IconGridDots,
   IconNotes, IconCalendarMonth, IconChartAreaLine, IconWallet,
   IconRepeat, IconSchool, IconCloudLock, IconSettings,
-  IconRobotFace,
+  IconRobotFace, IconBrain, IconCompass,
 } from '@tabler/icons-react';
 
 const PRIMARY = [
@@ -19,6 +19,7 @@ const PRIMARY = [
 ];
 
 const MORE = [
+  { key: 'context', label: 'Context', icon: IconBrain, color: '#7048e8' },
   { key: 'notes', label: 'Notes & Ideas', icon: IconNotes, color: '#7048e8' },
   { key: 'drive', label: 'Drive', icon: IconCloudLock, color: '#1971c2' },
   { key: 'learning', label: 'Learning', icon: IconSchool, color: '#e8590c' },
@@ -26,6 +27,7 @@ const MORE = [
   { key: 'finance', label: 'Finance', icon: IconWallet, color: '#0f766e' },
   { key: 'calendar', label: 'Calendar', icon: IconCalendarMonth, color: '#f08c00' },
   { key: 'reports', label: 'Reports', icon: IconChartAreaLine, color: '#5f3dc4' },
+  { key: 'planner', label: 'Planner', icon: IconCompass, color: '#1971c2' },
   { key: 'settings', label: 'Settings', icon: IconSettings, color: '#495057' },
 ];
 

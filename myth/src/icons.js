@@ -4,7 +4,7 @@
 import {
   IconDroplet, IconBarbell, IconBook, IconYoga, IconSalad, IconWalk,
   IconMoonStars, IconPencil, IconPalette, IconCode, IconHeart, IconSparkles,
-  IconCalendarEvent, IconCake, IconCreditCard, IconFlag, IconChecklist,
+  IconCalendarEvent, IconCake, IconCreditCard, IconFlag, IconChecklist, IconTargetArrow,
   IconMoodCry, IconMoodSad, IconMoodEmpty, IconMoodSmile, IconMoodHappy,
 } from '@tabler/icons-react';
 
@@ -39,6 +39,7 @@ export const EVENT_ICONS = {
   bill: { icon: IconCreditCard, color: '#e8590c' },
   event: { icon: IconFlag, color: '#1971c2' },
   task: { icon: IconChecklist, color: '#12a150' },
+  focus: { icon: IconTargetArrow, color: '#12a150' }, // Command Center focus block
 };
 
 export function eventIcon(kind) {

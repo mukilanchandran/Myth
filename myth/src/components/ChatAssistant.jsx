@@ -7,6 +7,9 @@ import { useStore } from '../store/useStore';
 import { askAssistant, resolveAI } from '../ai/assistant';
 
 const SUGGESTIONS = [
+  'What should I do now?',
+  "Prepare me for tomorrow's meeting",
+  'What should I handle today?',
   "What's on today's plan?",
   'What are my priorities today?',
   'Generate my monthly report',

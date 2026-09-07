@@ -1,0 +1,23 @@
+/* Life Command Center — home screen cards */
+
+@keyframes pulseRed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(224, 49, 49, 0); }
+}
+.pulse-red { animation: pulseRed 2s ease infinite; }
+
+/* timeline rows: time column stays aligned, the "now" rule glows softly */
+.cc-timeline .cc-row { transition: opacity 160ms ease; }
+.cc-timeline .cc-now { padding: 4px 0; }
+.cc-timeline .cc-now-rule {
+  flex: 1; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, #12a150, rgba(18, 161, 80, 0.15));
+}
+
+/* the recommendation reads like a spoken line */
+.cc-quote {
+  font-size: 15px; line-height: 1.45; font-weight: 500;
+  color: var(--ink);
+}
+.cc-quote::before { content: '\201C'; opacity: 0.35; margin-right: 2px; }
+.cc-quote::after { content: '\201D'; opacity: 0.35; margin-left: 2px; }

@@ -7,7 +7,7 @@ import { useStore } from '../../store/useStore';
 import { eventIcon } from '../../icons';
 
 export default function CalendarPanel() {
-  const { events, tasks, addEvent, addTask, deleteEvent, settings } = useStore();
+  const { events, tasks, addEvent, addTask, deleteEvent } = useStore();
   const [month, setMonth] = useState(dayjs().startOf('month'));
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ title: '', date: dayjs().format('YYYY-MM-DD'), time: '', kind: 'event' });
@@ -23,7 +23,7 @@ export default function CalendarPanel() {
       if (e.yearly) return dayjs(e.date).format('MM-DD') === d.format('MM-DD');
       return e.date === key;
     }).map((e) => ({ ...e, _kind: e.kind }));
-    const due = tasks.filter((t) => t.mode === settings.mode && t.status !== 'done' && t.due === key)
+    const due = tasks.filter((t) => t.status !== 'done' && t.due === key)
       .map((t) => ({ id: t.id, title: t.title, _kind: 'task', task: true }));
     return [...evs, ...due];
   };
@@ -134,7 +134,7 @@ export default function CalendarPanel() {
             if (!form.title.trim()) return;
             const date = dayjs(form.date).format('YYYY-MM-DD');
             if (form.kind === 'task') {
-              addTask({ title: form.title.trim(), due: date, mode: settings.mode });
+              addTask({ title: form.title.trim(), due: date });
             } else {
               addEvent({
                 title: form.title.trim(), date, time: form.time || null,

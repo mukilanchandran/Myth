@@ -61,11 +61,11 @@ function PlanPill({ item, onToggle, onDelete }) {
 }
 
 export default function DayPlan() {
-  const { plans, settings, addPlanItems, togglePlanItem, deletePlanItem, tasks } = useStore();
+  const { plans, addPlanItems, togglePlanItem, deletePlanItem, tasks } = useStore();
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState('');
 
-  const key = `${today()}|${settings.mode}`;
+  const key = today();
   const items = plans[key] ?? [];
   const doneCount = items.filter((i) => i.done).length;
   const allDone = items.length > 0 && doneCount === items.length;
@@ -79,11 +79,11 @@ export default function DayPlan() {
   const suggestions = useMemo(() => {
     const planned = new Set(items.map((i) => i.text.toLowerCase()));
     return tasks
-      .filter((t) => t.mode === settings.mode && t.status !== 'done')
+      .filter((t) => t.status !== 'done')
       .filter((t) => (t.due && new Date(t.due) - new Date() < 2 * 86400e3) || t.priority >= 4)
       .filter((t) => !planned.has(t.title.toLowerCase()))
       .slice(0, 5);
-  }, [tasks, settings.mode, items]);
+  }, [tasks, items]);
 
   const savePlan = () => {
     const lines = draft.split('\n').map((l) => l.trim()).filter(Boolean);
