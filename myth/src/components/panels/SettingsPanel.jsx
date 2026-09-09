@@ -93,7 +93,7 @@ function NotificationSection({ settings, setSettings }) {
         </Button>
       ) : (
         <Button
-          size="xs" radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}
+          size="xs" radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
           leftSection={<IconBellRinging size={14} />} loading={busy} onClick={enable}
           disabled={status === 'unsupported'}
         >
@@ -135,7 +135,7 @@ function NotificationSection({ settings, setSettings }) {
             <Button
               size="xs" radius="xl" loading={pushBusy}
               variant={pushOn ? 'light' : 'gradient'} color={pushOn ? 'gray' : undefined}
-              gradient={{ from: '#12a150', to: '#0f766e' }}
+              gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
               leftSection={<IconBellRinging size={14} />}
               onClick={togglePush}
             >
@@ -183,7 +183,7 @@ function StorageStatusCard({ status, loading, onRefresh, localFileCount }) {
         <Stack gap={8}>
           <Group justify="space-between" wrap="nowrap">
             <Group gap={6} wrap="nowrap">
-              <IconDatabase size={13} color="#0f766e" />
+              <IconDatabase size={13} color="#1b5a38" />
               <Text fz={12} fw={600}>Platform data (backup)</Text>
             </Group>
             <Text fz={11.5} c="dimmed" ta="right">{fmtBytes(db.cloudBytes)} in cloud · {fmtBytes(db.localBytes)} on this device</Text>

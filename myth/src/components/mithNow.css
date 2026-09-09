@@ -1,8 +1,8 @@
 /* MITH NOW — the big button and its sheet */
 
 @keyframes mithGlow {
-  0%, 100% { box-shadow: 0 14px 40px rgba(15, 118, 110, 0.45), 0 0 0 0 rgba(18, 161, 80, 0.55); }
-  50% { box-shadow: 0 14px 40px rgba(15, 118, 110, 0.45), 0 0 0 14px rgba(18, 161, 80, 0); }
+  0%, 100% { box-shadow: 0 14px 40px rgba(15, 118, 110, 0.45), 0 0 0 0 rgba(13, 45, 28, 0.55); }
+  50% { box-shadow: 0 14px 40px rgba(15, 118, 110, 0.45), 0 0 0 14px rgba(13, 45, 28, 0); }
 }
 @keyframes mithLive {
   0%, 100% { opacity: 1; }
@@ -14,7 +14,7 @@
   padding: 14px 22px 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 999px;
-  background: linear-gradient(135deg, #12a150 0%, #0f766e 100%);
+  background: linear-gradient(135deg, #0D2D1C 0%, #1b5a38 100%);
   color: #fff; font: inherit; font-weight: 800; font-size: 17px; letter-spacing: 0.2px;
   cursor: pointer;
   animation: mithGlow 2.6s ease-in-out infinite;
@@ -37,11 +37,11 @@
 .mith-now-badge {
   width: 30px; height: 30px; border-radius: 10px;
   display: grid; place-items: center; color: #fff; flex-shrink: 0;
-  background: linear-gradient(135deg, #12a150, #0f766e);
+  background: linear-gradient(135deg, #0D2D1C, #1b5a38);
 }
 
 .mith-quote-block {
-  border-left: 3px solid #0f766e;
+  border-left: 3px solid #1b5a38;
   padding: 6px 0 6px 14px;
 }
 .mith-headline {
@@ -55,8 +55,8 @@
   border: 1px solid rgba(15, 81, 50, 0.1);
 }
 .mith-card-primary {
-  background: linear-gradient(135deg, rgba(18, 161, 80, 0.1), rgba(15, 118, 110, 0.06));
-  border-color: rgba(18, 161, 80, 0.28);
+  background: linear-gradient(135deg, rgba(13, 45, 28, 0.1), rgba(15, 118, 110, 0.06));
+  border-color: rgba(13, 45, 28, 0.28);
 }
 .mith-quick { padding: 6px 8px; border-radius: 12px; transition: background 140ms ease; }
 .mith-quick:hover { background: rgba(255, 255, 255, 0.6); }
@@ -69,7 +69,7 @@
 .mith-timer {
   font-size: 72px; font-weight: 900; line-height: 1;
   font-variant-numeric: tabular-nums; letter-spacing: -1px;
-  color: #0f766e;
+  color: #1b5a38;
 }
 
 @media (max-width: 768px) {

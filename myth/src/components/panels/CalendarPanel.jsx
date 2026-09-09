@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
 import { Stack, Group, Text, ActionIcon, Box, Badge, Button, TextInput, Select, Modal } from '@mantine/core';
 import { DateInput, TimeInput } from '@mantine/dates';
 import { IconChevronLeft, IconChevronRight, IconPlus, IconTrash } from '@tabler/icons-react';
@@ -9,6 +10,8 @@ import { eventIcon } from '../../icons';
 export default function CalendarPanel() {
   const { events, tasks, addEvent, addTask, deleteEvent } = useStore();
   const [month, setMonth] = useState(dayjs().startOf('month'));
+  // narrow screens: day cells show coloured dots instead of titles
+  const compact = useMediaQuery('(max-width: 600px)');
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ title: '', date: dayjs().format('YYYY-MM-DD'), time: '', kind: 'event' });
 
@@ -56,20 +59,27 @@ export default function CalendarPanel() {
             return (
               <Box
                 key={d.format('YYYY-MM-DD')}
-                p={4}
+                p={compact ? 2 : 4}
                 onClick={() => openAddFor(d.format('YYYY-MM-DD'))}
                 title="Click to add a task or event on this date"
                 style={{
-                  minHeight: 64, borderRadius: 10, cursor: 'pointer',
-                  background: isToday ? 'rgba(18,161,80,0.18)' : 'rgba(255,255,255,0.45)',
-                  border: isToday ? '1.5px solid #12a150' : '1px solid rgba(20,60,40,0.08)',
+                  minHeight: compact ? 44 : 64, borderRadius: 10, cursor: 'pointer', minWidth: 0,
+                  background: isToday ? 'rgba(13,45,28,0.18)' : 'rgba(255,255,255,0.45)',
+                  border: isToday ? '1.5px solid #0D2D1C' : '1px solid rgba(20,60,40,0.08)',
                   opacity: inMonth ? 1 : 0.4,
                   transition: 'background 120ms ease, transform 120ms ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(18,161,80,0.12)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = isToday ? 'rgba(18,161,80,0.18)' : 'rgba(255,255,255,0.45)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(13,45,28,0.12)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = isToday ? 'rgba(13,45,28,0.18)' : 'rgba(255,255,255,0.45)'; }}
               >
                 <Text fz={11.5} fw={isToday ? 800 : 600} ta="right" pr={2}>{d.date()}</Text>
+                {compact ? (
+                  <Group gap={3} px={3} pt={2} wrap="wrap">
+                    {items.slice(0, 4).map((it) => (
+                      <Box key={it.id} w={6} h={6} style={{ borderRadius: 3, background: eventIcon(it._kind).color }} />
+                    ))}
+                  </Group>
+                ) : (
                 <Stack gap={2}>
                   {items.slice(0, 2).map((it) => {
                     const meta = eventIcon(it._kind);
@@ -82,6 +92,7 @@ export default function CalendarPanel() {
                   })}
                   {items.length > 2 && <Text fz={9} c="dimmed" px={4}>+{items.length - 2} more</Text>}
                 </Stack>
+                )}
               </Box>
             );
           })}

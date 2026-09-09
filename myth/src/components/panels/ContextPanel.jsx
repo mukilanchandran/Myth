@@ -143,7 +143,7 @@ function Briefing({ ctx, state, onSelect, onEditNote, setPanel }) {
         )}
       </Box>
 
-      <Section icon={IconChecklist} color="#12a150" title="Open tasks" count={ctx.openTasks.length}
+      <Section icon={IconChecklist} color="#0D2D1C" title="Open tasks" count={ctx.openTasks.length}
         extra={ctx.doneTasks.length > 0 && <Text fz={11.5} c="dimmed">{ctx.doneTasks.length} done</Text>}>
         {ctx.openTasks.map(({ node: t, via }) => {
           const late = t.date && dayjs(t.date).isBefore(dayjs(), 'day');
@@ -209,10 +209,10 @@ function Briefing({ ctx, state, onSelect, onEditNote, setPanel }) {
         })}
       </Section>
 
-      <Section icon={IconNotes} color="#0f766e" title="Related notes & ideas" count={ctx.notes.length}>
+      <Section icon={IconNotes} color="#1b5a38" title="Related notes & ideas" count={ctx.notes.length}>
         {ctx.notes.slice(0, 8).map(({ node: n, via }) => (
           <Row key={n.id} onClick={() => onEditNote(n.ref.id)}>
-            {n.type === 'idea' ? <IconBulb size={16} color="#f08c00" /> : <IconNotes size={16} color="#0f766e" />}
+            {n.type === 'idea' ? <IconBulb size={16} color="#f08c00" /> : <IconNotes size={16} color="#1b5a38" />}
             <Box style={{ flex: 1, minWidth: 0 }}>
               <Text fz={13.5} fw={600} lineClamp={1}>{n.label}</Text>
               {n.ref.body && <Text fz={12} c="dimmed" lineClamp={1}>{n.ref.body}</Text>}

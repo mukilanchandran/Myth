@@ -1,0 +1,109 @@
+/* MythBot — animated 3D-style mascot (see MythBot.jsx) */
+
+.mythbot {
+  display: inline-grid; place-items: center;
+  perspective: 160px;
+  --tilt-x: 0deg; --tilt-y: 0deg;
+  flex-shrink: 0;
+}
+.mythbot-rig {
+  display: block; width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.mythbot-svg {
+  display: block; overflow: visible;
+  animation: mythbotFloat 3.8s ease-in-out infinite;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+  transform-origin: 50% 90%;
+}
+
+/* float + gentle 3D sway */
+@keyframes mythbotFloat {
+  0%, 100% { transform: translateY(0) rotateY(-8deg) rotateZ(-1.5deg); }
+  25% { transform: translateY(-2.5px) rotateY(4deg) rotateZ(0deg); }
+  50% { transform: translateY(-4px) rotateY(10deg) rotateZ(1.5deg); }
+  75% { transform: translateY(-2px) rotateY(2deg) rotateZ(0.5deg); }
+}
+.mythbot-shadow { animation: mythbotShadow 3.8s ease-in-out infinite; transform-origin: 32px 69px; }
+@keyframes mythbotShadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.22; }
+  50% { transform: scaleX(0.72); opacity: 0.12; }
+}
+
+/* head: a slow curious tilt */
+.mythbot-head { transform-origin: 32px 38px; animation: mythbotHead 5.2s ease-in-out infinite; }
+@keyframes mythbotHead {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-4deg) translateX(-0.5px); }
+  60% { transform: rotate(3deg) translateX(0.5px); }
+}
+
+/* antenna ball bobs, out of phase with the float */
+.mythbot-antenna { transform-origin: 32px 13px; animation: mythbotAntenna 2.4s ease-in-out infinite; }
+@keyframes mythbotAntenna {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+.mythbot-ball { animation: mythbotBall 1.6s ease-in-out infinite; }
+@keyframes mythbotBall {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* eyes blink every few seconds */
+.mythbot-eye { transform-box: fill-box; transform-origin: center; animation: mythbotBlink 4.6s infinite; }
+.mythbot-eye:nth-child(2) { animation-delay: 0.04s; }
+@keyframes mythbotBlink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.08); }
+}
+
+/* the right arm waves */
+.mythbot-arm { transform-box: fill-box; }
+.mythbot-arm-r { transform-origin: 50% 12%; animation: mythbotWave 3.2s ease-in-out infinite; }
+@keyframes mythbotWave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  70% { transform: rotate(-38deg); }
+  80% { transform: rotate(-18deg); }
+  90% { transform: rotate(-40deg); }
+}
+.mythbot-arm-l { transform-origin: 50% 12%; animation: mythbotArmL 3.8s ease-in-out infinite; }
+@keyframes mythbotArmL {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(8deg); }
+}
+
+/* chest status bar breathes */
+.mythbot-status { animation: mythbotStatus 2.2s ease-in-out infinite; }
+@keyframes mythbotStatus {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* hover: pop toward the viewer */
+.mythbot:hover .mythbot-svg { animation-duration: 1.6s; }
+.mythbot:hover .mythbot-rig { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(1.18) translateZ(8px); }
+
+/* active (chat mode on): awake — brighter eyes, screen glow, quicker float */
+.mythbot.is-active .mythbot-svg { animation-duration: 2.2s; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 4px rgba(120, 230, 255, 0.55)); }
+.mythbot.is-active .mythbot-screen { filter: drop-shadow(0 0 2px rgba(120, 230, 255, 0.9)); }
+.mythbot.is-active .mythbot-eye { animation: mythbotBlink 3.2s infinite, mythbotEyeGlow 1.4s ease-in-out infinite; }
+@keyframes mythbotEyeGlow {
+  0%, 100% { filter: drop-shadow(0 0 1px #9cf0ff); }
+  50% { filter: drop-shadow(0 0 3px #ffffff); }
+}
+.mythbot.is-active .mythbot-status { fill: #4cff8f; }
+.mythbot.is-active .mythbot-arm-r { animation-duration: 2.2s; }
+
+/* thinking: head bobs faster, antenna spins */
+.mythbot.mood-thinking .mythbot-head { animation-duration: 1.2s; }
+.mythbot.mood-thinking .mythbot-antenna { animation-duration: 0.8s; }
+.mythbot.mood-thinking .mythbot-smile { d: path('M28 32 Q32 31 36 32'); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mythbot-svg, .mythbot-shadow, .mythbot-head, .mythbot-antenna, .mythbot-ball, .mythbot-eye, .mythbot-arm, .mythbot-status { animation: none !important; }
+  .mythbot-rig { transition: none; }
+}

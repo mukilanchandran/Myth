@@ -7,6 +7,7 @@ import { DateInput } from '@mantine/dates';
 import { IconPlus, IconTrash, IconDots, IconFlag, IconChevronDown } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useStore } from '../../store/useStore';
+import EmptyState from '../EmptyState';
 
 const STATUSES = [
   { value: 'todo', label: 'To do', color: 'gray' },
@@ -128,7 +129,7 @@ export default function TasksPanel() {
         ]}
       />
       <Stack gap={8}>
-        {shown.length === 0 && <Text c="dimmed" fz={14} ta="center" py="xl">No tasks here. Capture one from the landing bar.</Text>}
+        {shown.length === 0 && <EmptyState kind="tasks" title={filter === 'done' ? 'Nothing finished yet' : 'No tasks here'} hint={filter === 'done' ? 'Completed tasks land here — tick one off and watch it move.' : 'Type one above, or capture it from the bar on the home screen.'} />}
         {shown.map((t) => <TaskRow key={t.id} task={t} />)}
       </Stack>
     </Stack>

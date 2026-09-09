@@ -121,6 +121,7 @@ body {
   background: transparent;
   border: none;
   font-size: 17px;
+  height: 50px;
   color: var(--ink);
 }
 .capture-input input::placeholder { color: rgba(22, 40, 31, 0.55); }
@@ -177,40 +178,43 @@ html { -webkit-tap-highlight-color: transparent; }
 body { overscroll-behavior: none; }
 button, a, input, [role='button'] { touch-action: manipulation; }
 
-/* bottom tab bar */
+/* bottom tab bar — a floating white pill; the active tab is a dark pill */
 .mobile-nav {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
-  display: flex; align-items: flex-end; justify-content: space-around;
-  padding: 8px 4px calc(8px + env(safe-area-inset-bottom)) 4px;
-  border-radius: 22px 22px 0 0;
-  border-bottom: none;
+  position: fixed; bottom: calc(10px + env(safe-area-inset-bottom)); left: 12px; right: 12px; z-index: 30;
+  display: flex; align-items: center; justify-content: space-around;
+  padding: 8px 6px;
+  border-radius: 999px;
+  background: #fff !important; border: none !important;
+  box-shadow: 0 14px 40px rgba(20, 45, 33, 0.22) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
 }
 .mobile-tab {
   background: none; border: none; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-family: 'Figtree', sans-serif; font-size: 10.5px; font-weight: 600;
-  color: rgba(20, 45, 33, 0.58);
-  padding: 4px 10px; border-radius: 12px; min-width: 58px;
-  transition: color 140ms ease, transform 120ms ease;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-family: 'Figtree', sans-serif; font-size: 10.5px; font-weight: 700;
+  color: rgba(20, 45, 33, 0.62);
+  padding: 6px 12px; border-radius: 999px; min-width: 58px;
+  transition: color 140ms ease, transform 120ms ease, background 160ms ease;
 }
 .mobile-tab:active { transform: scale(0.94); }
-.mobile-tab[data-active] { color: #0f766e; }
+.mobile-tab[data-active] { color: #fff; background: #0f1f17; }
 .mobile-fab {
-  width: 56px; height: 56px; border-radius: 50%;
-  background: linear-gradient(135deg, #12a150, #0f766e);
+  width: 52px; height: 52px; border-radius: 50%;
+  background: linear-gradient(135deg, #f9c04a, #f0a316);
   display: grid; place-items: center;
-  margin-top: -30px;
-  border: 3px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 10px 26px rgba(15, 118, 110, 0.45);
+  margin-top: -26px;
+  border: 3px solid #fff;
+  box-shadow: 0 10px 26px rgba(240, 163, 22, 0.45);
   transition: transform 120ms ease;
 }
+.mobile-fab svg { color: #1a1408 !important; }
 .mobile-tab:active .mobile-fab { transform: scale(0.94); }
 .mobile-more-item {
   border-radius: 16px; background: #f7f9f8; border: 1px solid #e9eeeb;
   cursor: pointer; transition: transform 120ms ease, border-color 140ms ease;
 }
 .mobile-more-item:active { transform: scale(0.96); }
-.mobile-more-item[data-active] { border-color: #12a150; }
+.mobile-more-item[data-active] { border-color: #0D2D1C; }
 
 /* touch devices: hover lifts don't exist — keep taps crisp instead */
 @media (hover: none) {
@@ -248,4 +252,17 @@ button, a, input, [role='button'] { touch-action: manipulation; }
 
   /* full-bleed sheets: square off the outer offset Mantine adds */
   .mantine-Drawer-inner { padding: 0 !important; }
+
+  /* every dialog that isn't already full-screen becomes a bottom sheet */
+  .mantine-Modal-inner { padding: 0 !important; align-items: flex-end !important; }
+  .mantine-Modal-content:not([data-full-screen]) {
+    width: 100% !important; max-width: 100% !important; margin: 0 !important;
+    border-radius: 22px 22px 0 0 !important; max-height: 92dvh !important;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mantine-Popover-dropdown { max-width: calc(100vw - 16px) !important; }
+  .mantine-Spotlight-content { max-width: calc(100vw - 16px) !important; }
+
+  /* comfortable tap targets */
+  .mantine-ActionIcon-root[data-size='sm'], .mantine-ActionIcon-root[data-size='xs'] { min-width: 32px; min-height: 32px; }
 }

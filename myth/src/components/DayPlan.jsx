@@ -34,7 +34,7 @@ function PlanPill({ item, onToggle, onDelete }) {
           style={{
             width: 18, height: 18, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
             border: item.done ? 'none' : '2px solid rgba(255,255,255,0.55)',
-            background: item.done ? 'linear-gradient(135deg,#3ddc84,#0f766e)' : 'transparent',
+            background: item.done ? 'linear-gradient(135deg,#3ddc84,#1b5a38)' : 'transparent',
             display: 'grid', placeItems: 'center', padding: 0,
           }}
         >
@@ -102,12 +102,12 @@ export default function DayPlan() {
               onClick={() => setComposing(true)}
               style={{
                 cursor: 'pointer', borderRadius: 999,
-                border: '2px dashed rgba(255,255,255,0.6)',
-                background: 'rgba(255,255,255,0.16)', backdropFilter: 'blur(10px)',
+                border: '2px dashed rgba(15,31,23,0.35)',
+                background: '#fff',
               }}
             >
-              <IconPlus size={15} color="#fff" />
-              <Text fz={13} fw={700} c="#fff" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
+              <IconPlus size={15} color="#0f1f17" />
+              <Text fz={13} fw={700} c="#0f1f17">
                 Set today's plan
               </Text>
             </Group>
@@ -123,7 +123,7 @@ export default function DayPlan() {
                 style={{
                   cursor: 'pointer', borderRadius: 999,
                   background: allDone
-                    ? 'linear-gradient(135deg, rgba(18,161,80,0.9), rgba(15,118,110,0.9))'
+                    ? 'linear-gradient(135deg, rgba(13,45,28,0.9), rgba(15,118,110,0.9))'
                     : 'rgba(10,26,18,0.85)',
                   backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.22)',
                 }}

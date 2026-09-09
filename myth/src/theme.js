@@ -10,8 +10,8 @@ export const theme = createTheme({
   primaryShade: 6,
   colors: {
     forest: [
-      '#e8f8ee', '#d3eedd', '#a8dcbc', '#7aca99', '#54bb7c',
-      '#3cb26a', '#12a150', '#238a52', '#177a45', '#036a37',
+      '#e6efea', '#c9dbd1', '#a3bfb0', '#7ba38e', '#54876c',
+      '#2f6a4d', '#0D2D1C', '#0a2416', '#071b10', '#04120a',
     ],
   },
   defaultRadius: 'lg',

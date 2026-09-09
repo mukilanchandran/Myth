@@ -49,7 +49,7 @@ function DayCard({ d, pois }) {
         return (
           <div key={i} className="pl-item">
             <span className="pl-time">{it.time}</span>
-            <Icon size={15} color={it.kind === 'fuel' ? '#e8590c' : it.kind === 'food' ? '#0f766e' : it.kind === 'travel' ? '#1971c2' : '#12a150'} style={{ marginTop: 2 }} />
+            <Icon size={15} color={it.kind === 'fuel' ? '#e8590c' : it.kind === 'food' ? '#1b5a38' : it.kind === 'travel' ? '#1971c2' : '#0D2D1C'} style={{ marginTop: 2 }} />
             <div>
               <Text fz={13.5} fw={600}>{it.title}{p && <Anchor href={mapsLink(p.lat, p.lon)} target="_blank" rel="noopener" fz={11.5} ml={6}>map ↗</Anchor>}</Text>
               {it.note && <Text fz={12} c="dimmed">{it.note}</Text>}
@@ -65,7 +65,7 @@ function DayCard({ d, pois }) {
 function PoiList({ title, icon: Icon, items, empty, showKm = true }) {
   return (
     <Box>
-      <Group gap={6} mb={6}><Icon size={15} color="#0f766e" /><Text fw={700} fz={13}>{title}</Text></Group>
+      <Group gap={6} mb={6}><Icon size={15} color="#1b5a38" /><Text fw={700} fz={13}>{title}</Text></Group>
       {items.length === 0 ? <Text fz={12} c="dimmed">{empty}</Text> : (
         <Stack gap={5}>
           {items.slice(0, 8).map((p) => (
@@ -126,7 +126,7 @@ export default function TripPlanner({ session }) {
     const m = [];
     if (result.fromGeo) m.push({ ...result.fromGeo, label: `Start: ${result.fromGeo.name}`, color: '#1971c2', radius: 8 });
     m.push({ ...result.toGeo, label: result.toGeo.name, color: '#e03131', radius: 8 });
-    (variant?.days ?? []).flatMap((d) => d.items).forEach((it) => { const p = it.poi && allPois.find((x) => x.id === it.poi); if (p) m.push({ lat: p.lat, lon: p.lon, label: p.name ?? p.sub, color: p.kind === 'fuel' ? '#e8590c' : p.kind === 'food' ? '#0f766e' : p.kind === 'stay' ? '#7048e8' : '#12a150' }); });
+    (variant?.days ?? []).flatMap((d) => d.items).forEach((it) => { const p = it.poi && allPois.find((x) => x.id === it.poi); if (p) m.push({ lat: p.lat, lon: p.lon, label: p.name ?? p.sub, color: p.kind === 'fuel' ? '#e8590c' : p.kind === 'food' ? '#1b5a38' : p.kind === 'stay' ? '#7048e8' : '#0D2D1C' }); });
     return m;
   }, [result, variant, allPois]);
 
@@ -148,7 +148,7 @@ export default function TripPlanner({ session }) {
           <Select label="Getting there" radius="md" value={form.transport} onChange={(v) => setForm({ ...form, transport: v })} data={[{ value: 'car', label: 'Car' }, { value: 'bike', label: 'Bike' }, { value: 'train', label: 'Train' }, { value: 'bus', label: 'Bus' }, { value: 'flight', label: 'Flight' }]} />
         </SimpleGrid>
         <Group justify="flex-end" mt="sm">
-          <Button radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={result ? <IconRefresh size={15} /> : <IconRoute size={16} />} loading={running} onClick={run} disabled={!form.to || !form.start}>
+          <Button radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={result ? <IconRefresh size={15} /> : <IconRoute size={16} />} loading={running} onClick={run} disabled={!form.to || !form.start}>
             {result ? 'Re-plan' : 'Plan'}
           </Button>
         </Group>
@@ -212,7 +212,7 @@ export default function TripPlanner({ session }) {
 
           <Group justify="flex-end" gap="sm">
             {session.status === 'planned' && (
-              <Button radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={<IconFolderPlus size={16} />} onClick={() => setConfirming(true)}>Confirm this plan</Button>
+              <Button radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={<IconFolderPlus size={16} />} onClick={() => setConfirming(true)}>Confirm this plan</Button>
             )}
             {session.status === 'confirmed' && (
               <>

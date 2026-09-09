@@ -104,7 +104,7 @@ export const useStore = create(
       addProject: (p) => {
         const proj = {
           id: uid(), name: 'Untitled project', desc: '',
-          color: '#12a150', status: 'active', deadline: null, milestones: [],
+          color: '#0D2D1C', status: 'active', deadline: null, milestones: [],
           created: new Date().toISOString(), ...p,
         };
         set((s) => ({ projects: [proj, ...s.projects] }));

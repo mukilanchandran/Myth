@@ -90,7 +90,7 @@ export default function LiveTrip({ session }) {
   const wm = weather ? weatherMeta(weather.code) : null;
   const WIcon = wm?.icon;
   const list = near.filter((p) => p.kind === tab).sort((a, b) => a.km - b.km);
-  const markers = list.slice(0, 8).map((p) => ({ lat: p.lat, lon: p.lon, label: p.name ?? p.sub, color: tab === 'fuel' ? '#e8590c' : tab === 'food' ? '#0f766e' : tab === 'stay' ? '#7048e8' : '#1971c2' }));
+  const markers = list.slice(0, 8).map((p) => ({ lat: p.lat, lon: p.lon, label: p.name ?? p.sub, color: tab === 'fuel' ? '#e8590c' : tab === 'food' ? '#1b5a38' : tab === 'stay' ? '#7048e8' : '#1971c2' }));
   if (result?.toGeo) markers.push({ ...result.toGeo, label: result.toGeo.name, color: '#e03131', radius: 8 });
 
   return (
@@ -124,7 +124,7 @@ export default function LiveTrip({ session }) {
       {/* ----- what Myth says ----- */}
       {(aiLine || tips.length > 0) && (
         <Box className="glass" p="sm" style={{ borderRadius: 16 }}>
-          <Text fw={800} fz={12} tt="uppercase" lts={1} c="#12a150" mb={4}>{APP_NAME} says</Text>
+          <Text fw={800} fz={12} tt="uppercase" lts={1} c="#0D2D1C" mb={4}>{APP_NAME} says</Text>
           {aiLine && <Text fz={14} fw={500} mb={6}>“{aiLine}”</Text>}
           <Stack gap={3}>{tips.map((t, i) => <Text key={i} fz={12.5}>• {t.text}</Text>)}</Stack>
         </Box>
@@ -155,7 +155,7 @@ export default function LiveTrip({ session }) {
             <div key={p.id} className="pl-poi">
               <Group justify="space-between" wrap="nowrap" gap={6}>
                 <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
-                  <IconMapPin size={14} color="#0f766e" style={{ flexShrink: 0 }} />
+                  <IconMapPin size={14} color="#1b5a38" style={{ flexShrink: 0 }} />
                   <Text fz={13} fw={600} lineClamp={1}>{p.name ?? 'Fuel station'}</Text>
                 </Group>
                 <Anchor href={mapsLink(p.lat, p.lon)} target="_blank" rel="noopener" fz={12} style={{ flexShrink: 0 }}><Group gap={3} wrap="nowrap"><IconNavigation size={12} />{p.km} km {pos ? compass(bearingDeg(pos, p)) : ''}</Group></Anchor>

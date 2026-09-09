@@ -1,18 +1,17 @@
+// Top of the canvas: brand on the left; weather, search and the bell tucked
+// into the right corner (settings joins them on phones, where there is no rail).
 import { useState } from 'react';
-import { Box, Group, Text, ActionIcon, Tooltip, Popover } from '@mantine/core';
-import { IconSearch, IconBell, IconSettings, IconLogout } from '@tabler/icons-react';
+import { Box, Group, Text, Popover, Tooltip } from '@mantine/core';
+import { IconSearch, IconBell, IconSettings } from '@tabler/icons-react';
 import { spotlight } from '@mantine/spotlight';
 import { useStore } from '../store/useStore';
 import { visibleNotifications } from '../ai/notifications.js';
 import NotificationCenter from './NotificationCenter';
 import WeatherChip from './Weather';
-import { asset } from '../config/env';
+import { asset, APP_NAME } from '../config/env';
 
-const glassBtn = { root: { background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.45)', backdropFilter: 'blur(10px)' } };
-
-export default function TopBar({ onOpen }) {
+export default function TopBar({ onOpen, desktop }) {
   const state = useStore();
-  const { logout } = state;
   const [open, setOpen] = useState(false);
   // the bell shows what the Notification Intelligence Engine has a reason for;
   // the badge counts only what needs a decision
@@ -20,36 +19,27 @@ export default function TopBar({ onOpen }) {
   const count = notifs.filter((n) => n.level !== 'fyi').length;
 
   return (
-    <Group justify="space-between" px={{ base: 12, sm: 28 }} py={14} style={{ position: 'relative', zIndex: 5 }}>
-      <Group gap={12}>
-        <img
-          className="top-logo"
-          src={asset('logo.png')}
-          alt="Myth"
-          style={{ height: 34, display: 'block', borderRadius: '50%', filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.35))' }}
-        />
-        <Box visibleFrom="sm"><WeatherChip /></Box>
-      </Group>
+    <div className="canvas-top">
+      <div className="canvas-brand">
+        <img className="top-logo" src={asset('logo.png')} alt={APP_NAME} style={{ height: 34, display: 'block', borderRadius: '50%' }} />
+        {desktop && <span>{APP_NAME}</span>}
+      </div>
 
-      <Group gap={8}>
-        <Tooltip label="Search everything (Ctrl+K)">
-          <ActionIcon size={40} radius="xl" variant="default" onClick={spotlight.open} visibleFrom="sm" styles={glassBtn}>
-            <IconSearch size={19} color="#fff" />
-          </ActionIcon>
+      <div className="canvas-top-actions">
+        <Box visibleFrom="sm"><WeatherChip /></Box>
+
+        <Tooltip label="Search everything (Ctrl K)">
+          <button type="button" className="canvas-icon-btn" onClick={spotlight.open} aria-label="Search">
+            <IconSearch size={19} />
+          </button>
         </Tooltip>
 
         <Popover width="min(380px, calc(100vw - 24px))" position="bottom-end" radius="lg" shadow="xl" opened={open} onChange={setOpen}>
           <Popover.Target>
-            <ActionIcon size={40} radius="xl" variant="default" styles={glassBtn} onClick={() => setOpen((o) => !o)} aria-label="Notifications">
-              <Box pos="relative">
-                <IconBell size={19} color="#fff" />
-                {count > 0 && (
-                  <Box pos="absolute" top={-4} right={-6} w={16} h={16} bg="red" style={{ borderRadius: 8, fontSize: 10, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700 }}>
-                    {count}
-                  </Box>
-                )}
-              </Box>
-            </ActionIcon>
+            <button type="button" className="canvas-icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Notifications">
+              <IconBell size={19} />
+              {count > 0 && <span className="rail-badge">{count}</span>}
+            </button>
           </Popover.Target>
           <Popover.Dropdown p="sm">
             <Group justify="space-between" mb={8}>
@@ -62,17 +52,12 @@ export default function TopBar({ onOpen }) {
           </Popover.Dropdown>
         </Popover>
 
-        <Tooltip label="Settings">
-          <ActionIcon size={40} radius="xl" variant="default" onClick={() => onOpen('settings')} styles={glassBtn}>
-            <IconSettings size={19} color="#fff" />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Lock">
-          <ActionIcon size={40} radius="xl" variant="default" onClick={logout} visibleFrom="sm" styles={glassBtn}>
-            <IconLogout size={19} color="#fff" />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
-    </Group>
+        {!desktop && (
+          <Tooltip label="Settings">
+            <button type="button" className="canvas-icon-btn" onClick={() => onOpen('settings')} aria-label="Settings"><IconSettings size={19} /></button>
+          </Tooltip>
+        )}
+      </div>
+    </div>
   );
 }

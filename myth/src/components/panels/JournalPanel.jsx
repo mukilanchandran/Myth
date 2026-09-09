@@ -4,11 +4,12 @@ import { IconMoodHappy, IconMoodSmile, IconMoodEmpty, IconMoodSad, IconTrash, Ic
 import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
 import { useStore } from '../../store/useStore';
+import EmptyState from '../EmptyState';
 import { resolveAI } from '../../ai/assistant';
 import { streamChat } from '../../ai/ollama';
 
 const MOODS = [
-  { value: 5, label: 'great', icon: IconMoodHappy, color: '#12a150' },
+  { value: 5, label: 'great', icon: IconMoodHappy, color: '#0D2D1C' },
   { value: 4, label: 'good', icon: IconMoodSmile, color: '#74b816' },
   { value: 3, label: 'okay', icon: IconMoodEmpty, color: '#f08c00' },
   { value: 2, label: 'low', icon: IconMoodSad, color: '#e8590c' },
@@ -101,7 +102,7 @@ export default function JournalPanel() {
       </Box>
 
       {entries.length === 0 && (
-        <Text c="dimmed" ta="center" py="xl" fz={14}>One honest line a day compounds into your monthly story.</Text>
+        <EmptyState kind="journal" color="#7048e8" title="No entries yet" hint="One honest line a day compounds into your monthly story." />
       )}
 
       <Stack gap={10}>

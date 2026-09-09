@@ -12,7 +12,7 @@ import { monthStats, narrative } from '../../ai/insights';
 import { aiMonthReview } from '../../ai/assistant';
 import { habitIcon } from '../../icons';
 
-const COLORS = ['#12a150', '#1971c2', '#e8590c', '#7048e8', '#f08c00', '#e03131', '#0ca678'];
+const COLORS = ['#0D2D1C', '#1971c2', '#e8590c', '#7048e8', '#f08c00', '#e03131', '#0ca678'];
 
 const rise = (i) => ({
   initial: { opacity: 0, y: 26, scale: 0.97 },
@@ -107,7 +107,7 @@ export default function ReportsPanel() {
             Regenerate
           </Button>
           <Button
-            size="xs" radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}
+            size="xs" radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
             leftSection={<IconSparkles size={14} />} loading={aiBusy} onClick={writeWithAI}
           >
             Write with AI
@@ -122,7 +122,7 @@ export default function ReportsPanel() {
             <motion.div {...rise(0)}>
               <Box className="glass" p="lg" style={{ borderRadius: 20 }}>
                 <Group gap={8} mb={8}>
-                  <IconCalendarStats size={18} color="#12a150" />
+                  <IconCalendarStats size={18} color="#0D2D1C" />
                   <Text fw={800} fz={15}>Myth's month-in-review</Text>
                   {aiText !== null
                     ? <Badge size="xs" variant="light" color="grape">{aiModel ? `AI · ${aiModel}` : 'AI writing…'}</Badge>
@@ -146,7 +146,7 @@ export default function ReportsPanel() {
 
             {/* Big numbers */}
             <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
-              <BigStat i={1} label="Tasks completed" value={stats.completed} color="#0b7a3e" />
+              <BigStat i={1} label="Tasks completed" value={stats.completed} color="#0D2D1C" />
               <BigStat i={2} label="Completion rate" value={stats.completionRate} suffix="%" color="#1971c2" />
               <BigStat i={3} label="Meetings logged" value={stats.meetings} color="#7048e8" />
               <BigStat i={4} label="Ideas captured" value={stats.ideas} color="#f08c00" />
@@ -162,7 +162,7 @@ export default function ReportsPanel() {
                   dataKey="week"
                   series={[
                     { name: 'created', color: '#a8dcbc' },
-                    { name: 'completed', color: '#12a150' },
+                    { name: 'completed', color: '#0D2D1C' },
                   ]}
                   radius={6}
                   withLegend
@@ -205,7 +205,7 @@ export default function ReportsPanel() {
                       />
                     )}
                     <Stack gap={6}>
-                      <Text fz={14}>Earned <b style={{ color: '#0b7a3e' }}>₹{stats.earned.toLocaleString('en-IN')}</b></Text>
+                      <Text fz={14}>Earned <b style={{ color: '#0D2D1C' }}>₹{stats.earned.toLocaleString('en-IN')}</b></Text>
                       <Text fz={14}>Spent <b style={{ color: '#c92a2a' }}>₹{stats.spent.toLocaleString('en-IN')}</b></Text>
                       <Text fz={14}>{stats.savings >= 0 ? 'Saved' : 'Overspent'} <b>₹{Math.abs(stats.savings).toLocaleString('en-IN')}</b></Text>
                     </Stack>
@@ -223,9 +223,9 @@ export default function ReportsPanel() {
                       return (
                         <motion.div key={h.name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 + i * 0.1 }}>
                           <Group gap={8} wrap="nowrap">
-                            <RingProgress size={52} thickness={6} roundCaps sections={[{ value: h.pct, color: h.pct >= 60 ? '#12a150' : '#f08c00' }]}
+                            <RingProgress size={52} thickness={6} roundCaps sections={[{ value: h.pct, color: h.pct >= 60 ? '#0D2D1C' : '#f08c00' }]}
                               label={<Text ta="center" fz={10} fw={700}>{h.pct}%</Text>} />
-                            <HIcon size={15} color="#0f766e" style={{ flexShrink: 0 }} />
+                            <HIcon size={15} color="#1b5a38" style={{ flexShrink: 0 }} />
                             <Text fz={12.5}>{h.name}</Text>
                           </Group>
                         </motion.div>
@@ -240,7 +240,7 @@ export default function ReportsPanel() {
             {stats.topTasks.length > 0 && (
               <motion.div {...rise(6)}>
                 <Box className="glass" p="lg" style={{ borderRadius: 20 }}>
-                  <Group gap={8} mb="sm"><IconBulb size={17} color="#12a150" /><Text fw={700} fz={14}>Highlights shipped</Text></Group>
+                  <Group gap={8} mb="sm"><IconBulb size={17} color="#0D2D1C" /><Text fw={700} fz={14}>Highlights shipped</Text></Group>
                   <Stack gap={6}>
                     {stats.topTasks.map((t) => (
                       <Group key={t.id} gap={8} wrap="nowrap">

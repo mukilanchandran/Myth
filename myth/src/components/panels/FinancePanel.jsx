@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Stack, Group, Text, ActionIcon, TextInput, Button, Box, NumberInput, Select,
-  SegmentedControl, Badge, Table,
+  SegmentedControl, Badge,
 } from '@mantine/core';
 import { IconPlus, IconTrash, IconTrendingUp, IconTrendingDown, IconPigMoney } from '@tabler/icons-react';
 import { DonutChart } from '@mantine/charts';
@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import { useStore } from '../../store/useStore';
 
 const CATEGORIES = ['Food', 'Groceries', 'Transport', 'Home & Bills', 'Entertainment', 'Health', 'Shopping', 'Learning', 'Salary', 'Other'];
-const COLORS = ['#12a150', '#1971c2', '#e8590c', '#7048e8', '#f08c00', '#e03131', '#0ca678', '#845ef7', '#3bc9db', '#868e96'];
+const COLORS = ['#0D2D1C', '#1971c2', '#e8590c', '#7048e8', '#f08c00', '#e03131', '#0ca678', '#845ef7', '#3bc9db', '#868e96'];
 
 export default function FinancePanel() {
   const { transactions, addTransaction, deleteTransaction } = useStore();
@@ -42,9 +42,9 @@ export default function FinancePanel() {
   return (
     <Stack gap="md">
       <Group gap="sm" grow>
-        {stat('Income', earned, <IconTrendingUp size={16} color="#12a150" />, '#0b7a3e')}
+        {stat('Income', earned, <IconTrendingUp size={16} color="#0D2D1C" />, '#0D2D1C')}
         {stat('Spent', spent, <IconTrendingDown size={16} color="#e03131" />, '#c92a2a')}
-        {stat('Net', earned - spent, <IconPigMoney size={16} color="#1971c2" />, earned - spent >= 0 ? '#0b7a3e' : '#c92a2a')}
+        {stat('Net', earned - spent, <IconPigMoney size={16} color="#1971c2" />, earned - spent >= 0 ? '#0D2D1C' : '#c92a2a')}
       </Group>
 
       {donut.length > 0 && (
@@ -70,34 +70,30 @@ export default function FinancePanel() {
           value={type} onChange={setType} radius="xl" size="xs" mb="sm" fullWidth
           data={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}
         />
-        <Group gap="xs">
+        <Group gap="xs" wrap="wrap">
           <NumberInput radius="xl" placeholder="Amount ₹" hideControls w={110} value={amount} onChange={setAmount} />
           <Select radius="xl" data={CATEGORIES} value={category} onChange={setCategory} w={140} />
-          <TextInput radius="xl" placeholder="Note" style={{ flex: 1 }} value={note} onChange={(e) => setNote(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <TextInput radius="xl" placeholder="Note" style={{ flex: 1, minWidth: 150 }} value={note} onChange={(e) => setNote(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
           <ActionIcon size={36} radius="xl" variant="filled" color="forest" onClick={add}><IconPlus size={18} /></ActionIcon>
         </Group>
         <Text fz={11.5} c="dimmed" mt={6}>Tip: just type "spent 250 on lunch" in the landing capture bar — it lands here automatically.</Text>
       </Box>
 
-      <Table verticalSpacing={6}>
-        <Table.Tbody>
-          {[...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30).map((t) => (
-            <Table.Tr key={t.id}>
-              <Table.Td w={70}><Text fz={12} c="dimmed">{dayjs(t.date).format('MMM D')}</Text></Table.Td>
-              <Table.Td><Text fz={13}>{t.note || t.category}</Text></Table.Td>
-              <Table.Td w={100}><Badge size="xs" variant="light">{t.category}</Badge></Table.Td>
-              <Table.Td w={100} align="right">
-                <Text fz={13} fw={700} c={t.type === 'income' ? 'green' : 'red'}>
-                  {t.type === 'income' ? '+' : '−'}₹{t.amount.toLocaleString('en-IN')}
-                </Text>
-              </Table.Td>
-              <Table.Td w={40}>
-                <ActionIcon size="sm" variant="subtle" color="red" onClick={() => deleteTransaction(t.id)}><IconTrash size={13} /></ActionIcon>
-              </Table.Td>
-            </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
+      <Stack gap={0}>
+        {[...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30).map((t) => (
+          <Group key={t.id} gap={8} wrap="nowrap" px={4} py={7} style={{ borderBottom: '1px solid rgba(20,60,40,0.07)' }}>
+            <Text fz={11.5} c="dimmed" w={46} style={{ flexShrink: 0 }}>{dayjs(t.date).format('MMM D')}</Text>
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              <Text fz={13} lineClamp={1}>{t.note || t.category}</Text>
+              <Badge size="xs" variant="light" mt={2}>{t.category}</Badge>
+            </Box>
+            <Text fz={13} fw={700} c={t.type === 'income' ? 'green' : 'red'} style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+              {t.type === 'income' ? '+' : '−'}₹{t.amount.toLocaleString('en-IN')}
+            </Text>
+            <ActionIcon size="sm" variant="subtle" color="red" onClick={() => deleteTransaction(t.id)}><IconTrash size={13} /></ActionIcon>
+          </Group>
+        ))}
+      </Stack>
     </Stack>
   );
 }

@@ -36,7 +36,7 @@ export default function ContextStrip() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
-      <Box maw={1400} mx="auto" px={{ base: 12, sm: 24 }} mb="md">
+      <Box w="100%">
         <Box
           className="glass-strong hover-lift"
           px="md" py={10}

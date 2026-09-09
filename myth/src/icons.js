@@ -38,8 +38,8 @@ export const EVENT_ICONS = {
   birthday: { icon: IconCake, color: '#e64980' },
   bill: { icon: IconCreditCard, color: '#e8590c' },
   event: { icon: IconFlag, color: '#1971c2' },
-  task: { icon: IconChecklist, color: '#12a150' },
-  focus: { icon: IconTargetArrow, color: '#12a150' }, // Command Center focus block
+  task: { icon: IconChecklist, color: '#0D2D1C' },
+  focus: { icon: IconTargetArrow, color: '#0D2D1C' }, // Command Center focus block
 };
 
 export function eventIcon(kind) {
@@ -51,5 +51,5 @@ export const MOOD_ICONS = [
   { icon: IconMoodSad, color: '#f08c00', label: 'Low' },
   { icon: IconMoodEmpty, color: '#868e96', label: 'Okay' },
   { icon: IconMoodSmile, color: '#74b816', label: 'Good' },
-  { icon: IconMoodHappy, color: '#12a150', label: 'Great' },
+  { icon: IconMoodHappy, color: '#0D2D1C', label: 'Great' },
 ];

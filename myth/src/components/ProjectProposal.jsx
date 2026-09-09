@@ -90,7 +90,7 @@ export default function ProjectProposal() {
       title={(
         <div>
           <Group gap={6}>
-            <IconSparkles size={16} color="#12a150" />
+            <IconSparkles size={16} color="#0D2D1C" />
             <Text fw={800} fz={18}>{APP_NAME} drafted a plan</Text>
           </Group>
           <Text fz={12.5} c="dimmed" mt={2}>Nothing is created yet. Untick what you don't need, then create the project.</Text>
@@ -156,7 +156,7 @@ export default function ProjectProposal() {
           <Group gap={8}>
             <Button variant="subtle" color="gray" radius="xl" onClick={discardProposal}>Not now</Button>
             <Button
-              radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}
+              radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
               leftSection={<IconFolderPlus size={16} />} onClick={create} disabled={!name.trim()}
             >
               Create project

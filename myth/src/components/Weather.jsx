@@ -59,20 +59,19 @@ export default function WeatherChip() {
         px={12} py={6}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 999,
-          background: 'rgba(255,255,255,0.28)', backdropFilter: 'blur(14px)',
-          border: '1px solid rgba(255,255,255,0.4)', transition: 'transform 140ms ease',
+          background: '#fff', boxShadow: '0 8px 26px rgba(20,45,33,0.08)', transition: 'transform 140ms ease',
         }}
         className="dock-btn"
       >
-        <MIcon size={18} color="#fff" />
-        <Text c="white" fw={700} fz={14}>{Math.round(cur.temperature_2m)}°</Text>
+        <MIcon size={18} color={meta.color} />
+        <Text c="#0f1f17" fw={700} fz={14}>{Math.round(cur.temperature_2m)}°</Text>
       </Box>
 
       <Modal
         opened={open} onClose={() => setOpen(false)} size="md" radius="xl" centered
         title={
           <Group gap={8}>
-            <IconMapPin size={18} color="#12a150" />
+            <IconMapPin size={18} color="#0D2D1C" />
             <Text fw={800} fz={17}>{loc.name}</Text>
           </Group>
         }
@@ -96,7 +95,7 @@ export default function WeatherChip() {
                 { icon: IconWind, label: 'Wind', value: `${Math.round(cur.wind_speed_10m)} km/h` },
               ].map((s) => (
                 <Box key={s.label} p="sm" ta="center" style={{ background: '#f6f9f7', borderRadius: 14, border: '1px solid #e9eeeb' }}>
-                  <s.icon size={18} color="#0f766e" />
+                  <s.icon size={18} color="#1b5a38" />
                   <Text fz={15} fw={800}>{s.value}</Text>
                   <Text fz={11.5} c="dimmed">{s.label}</Text>
                 </Box>

@@ -1,11 +1,11 @@
 /* Myth Planner */
 .pl-rail-item { border-radius: 12px; cursor: pointer; transition: background 120ms ease; }
-.pl-rail-item:hover { background: rgba(18, 161, 80, 0.08); }
-.pl-rail-item[data-active] { background: rgba(18, 161, 80, 0.14); }
+.pl-rail-item:hover { background: rgba(13, 45, 28, 0.08); }
+.pl-rail-item[data-active] { background: rgba(13, 45, 28, 0.14); }
 
 .pl-chat { border-top: 1px solid #eef1ef; padding-top: 10px; }
 .pl-msg { border-radius: 14px; padding: 8px 12px; max-width: 92%; font-size: 13px; line-height: 1.5; white-space: pre-line; }
-.pl-msg[data-role='user'] { margin-left: auto; background: linear-gradient(135deg, #12a150, #0f766e); color: #fff; }
+.pl-msg[data-role='user'] { margin-left: auto; background: linear-gradient(135deg, #0D2D1C, #1b5a38); color: #fff; }
 .pl-msg[data-role='ai'] { background: #f3f6f4; color: #16281f; }
 
 .pl-day { border: 1px solid #e9eeeb; border-radius: 16px; background: #fbfcfb; }
@@ -16,7 +16,7 @@
 .pl-map .leaflet-container { font-family: inherit; }
 
 .pl-poi { border: 1px solid #e9eeeb; border-radius: 12px; padding: 8px 10px; background: #fff; }
-.pl-poi a { color: #0f766e; font-weight: 600; text-decoration: none; }
+.pl-poi a { color: #1b5a38; font-weight: 600; text-decoration: none; }
 
-@keyframes plPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(18, 161, 80, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(18, 161, 80, 0); } }
-.pl-live-dot { width: 10px; height: 10px; border-radius: 50%; background: #12a150; animation: plPulse 2s ease infinite; }
+@keyframes plPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(13, 45, 28, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(13, 45, 28, 0); } }
+.pl-live-dot { width: 10px; height: 10px; border-radius: 50%; background: #0D2D1C; animation: plPulse 2s ease infinite; }

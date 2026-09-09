@@ -53,10 +53,10 @@ export function extractPeople(text = '', participants = '') {
   return [...found.entries()].map(([key, name]) => ({ key, name }));
 }
 
-export function relDay(date) {
+export function relDay(date, now = dayjs()) {
   if (!date) return '';
   const d = dayjs(date);
-  const diff = d.startOf('day').diff(dayjs().startOf('day'), 'day');
+  const diff = d.startOf('day').diff(dayjs(now).startOf('day'), 'day');
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Tomorrow';
   if (diff === -1) return 'Yesterday';

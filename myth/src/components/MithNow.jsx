@@ -200,7 +200,7 @@ export default function MithNowSheet({ opened, onClose, onOpen }) {
         <Group gap={10} wrap="nowrap">
           <Box className="mith-now-badge"><IconBolt size={16} stroke={2.4} /></Box>
           <div>
-            <Text fw={900} fz={13} lts={2.4} tt="uppercase" c="#0f766e">{BRAND}</Text>
+            <Text fw={900} fz={13} lts={2.4} tt="uppercase" c="#1b5a38">{BRAND}</Text>
             <Text fz={12} c="dimmed" mt={1}>Real-time decision support · {now.format('h:mm A')}</Text>
           </div>
         </Group>
@@ -258,7 +258,7 @@ function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQui
           action={<Button radius="xl" variant="light" color="grape" onClick={() => onOpen('habits')}>Close the day</Button>} />
       )}
       {mood === 'clear' && (
-        <EmptyCard icon={<IconCircleCheck size={26} color="#12a150" />} title="Your plate is clear" text={`${fmtDuration(w.minutes)} of open time and nothing waiting. Pull something from the backlog or capture tomorrow.`}
+        <EmptyCard icon={<IconCircleCheck size={26} color="#0D2D1C" />} title="Your plate is clear" text={`${fmtDuration(w.minutes)} of open time and nothing waiting. Pull something from the backlog or capture tomorrow.`}
           action={<Button radius="xl" variant="light" color="forest" onClick={() => onOpen('tasks')}>Browse the backlog</Button>} />
       )}
       {mood === 'tight' && (
@@ -267,7 +267,7 @@ function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQui
 
       {(primary || quick.length > 0) && (
         <>
-          <Text fz={12} fw={800} tt="uppercase" lts={1.5} c="#0f766e">{APP_NAME} recommends</Text>
+          <Text fz={12} fw={800} tt="uppercase" lts={1.5} c="#1b5a38">{APP_NAME} recommends</Text>
 
           {primary && (
             <Box className="mith-card mith-card-primary">
@@ -284,7 +284,7 @@ function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQui
                 </div>
                 <Box ta="right" style={{ flexShrink: 0 }}>
                   <Text fz={11} c="dimmed" fw={700} tt="uppercase" lts={0.8}>Estimated</Text>
-                  <Text fz={26} fw={900} lh={1} c="#0f766e" style={{ fontVariantNumeric: 'tabular-nums' }}>{primary.minutes}<Text span fz={13} fw={700} ml={3}>min</Text></Text>
+                  <Text fz={26} fw={900} lh={1} c="#1b5a38" style={{ fontVariantNumeric: 'tabular-nums' }}>{primary.minutes}<Text span fz={13} fw={700} ml={3}>min</Text></Text>
                   {primary.partial && <Text fz={11} c="dimmed" mt={2}>of ~{primary.estimate} total</Text>}
                 </Box>
               </Group>
@@ -294,7 +294,7 @@ function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQui
               )}
 
               <Group gap={8} mt={12} wrap="wrap">
-                <Button radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={<IconPlayerPlay size={15} />} onClick={onStart}>
+                <Button radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={<IconPlayerPlay size={15} />} onClick={onStart}>
                   Start now · {primary.minutes} min
                 </Button>
                 <Button radius="xl" variant="light" color="forest" leftSection={<IconCheck size={15} />} onClick={onDone}>Already done</Button>
@@ -323,7 +323,7 @@ function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQui
                       </Tooltip>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <Text fz={13.5} fw={600} lineClamp={1}>
-                          <Text span fz={11} fw={800} c="#0f766e" tt="uppercase" lts={0.8} mr={6}>Quick win</Text>
+                          <Text span fz={11} fw={800} c="#1b5a38" tt="uppercase" lts={0.8} mr={6}>Quick win</Text>
                           {q.title}
                         </Text>
                         {q.sub && <Text fz={11.5} c="dimmed" lineClamp={1}>{q.sub}</Text>}
@@ -404,7 +404,7 @@ function SprintView({ session, sprint, window: w, onDone, onStop }) {
   const left = Math.max(0, sprint.left);
   return (
     <Stack gap="md" pt={4} align="center">
-      <Text fz={12} fw={800} tt="uppercase" lts={1.5} c={sprint.over ? '#e03131' : '#0f766e'}>
+      <Text fz={12} fw={800} tt="uppercase" lts={1.5} c={sprint.over ? '#e03131' : '#1b5a38'}>
         {sprint.over ? "Time's up" : 'Sprint in progress'}
       </Text>
       <Text fz={22} fw={800} ta="center" lh={1.2}>{session.title}</Text>
@@ -416,7 +416,7 @@ function SprintView({ session, sprint, window: w, onDone, onStop }) {
           : `Until ${session.until}${w.next ? ` · ${w.next.title} at ${w.next.at}` : ''}`}
       </Text>
       <Group gap={8} mt={4} wrap="wrap" justify="center">
-        <Button radius="xl" size="md" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={<IconCheck size={17} />} onClick={onDone}>
+        <Button radius="xl" size="md" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={<IconCheck size={17} />} onClick={onDone}>
           Done
         </Button>
         <Button radius="xl" size="md" variant="light" color="gray" leftSection={<IconPlayerStop size={16} />} onClick={onStop}>

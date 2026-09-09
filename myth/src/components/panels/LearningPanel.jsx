@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../store/useStore';
 
 const STAGES = ['Want to learn', 'Learning', 'Applied', 'Taught / Shared'];
-const STAGE_COLORS = ['#8a9691', '#1971c2', '#12a150', '#7048e8'];
+const STAGE_COLORS = ['#8a9691', '#1971c2', '#0D2D1C', '#7048e8'];
 
 export default function LearningPanel() {
   const { learning, addLearning, moveLearning, deleteLearning } = useStore();
@@ -87,7 +87,7 @@ export default function LearningPanel() {
         <Text fw={700} fz={14} mb={8}>Learning score</Text>
         <SimpleGrid cols={3} spacing="sm">
           {[
-            { n: applied, label: 'Applied in real work', color: '#12a150' },
+            { n: applied, label: 'Applied in real work', color: '#0D2D1C' },
             { n: inProgress, label: 'In progress', color: '#1971c2' },
             { n: queued, label: 'In the queue', color: '#8a9691' },
           ].map((s) => (

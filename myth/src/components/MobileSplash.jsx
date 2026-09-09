@@ -47,7 +47,7 @@ export default function MobileSplash() {
           transition={{ delay: 0.3, duration: 1.2, ease: 'easeInOut' }}
           style={{
             width: 120, height: 3, borderRadius: 2, transformOrigin: 'left',
-            background: 'linear-gradient(90deg,#3ddc84,#0f766e)', marginTop: 10,
+            background: 'linear-gradient(90deg,#3ddc84,#1b5a38)', marginTop: 10,
           }}
         />
       </Box>

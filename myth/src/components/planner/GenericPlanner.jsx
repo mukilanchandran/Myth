@@ -101,7 +101,7 @@ export default function GenericPlanner({ session }) {
         </SimpleGrid>
         <Group justify="space-between" mt="sm">
           <Text fz={12} c="dimmed">{mode.hint}</Text>
-          <Button radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={plan ? <IconRefresh size={15} /> : <IconSparkles size={15} />} loading={running} disabled={!name.trim()} onClick={run}>{plan ? 'Re-plan' : 'Plan'}</Button>
+          <Button radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={plan ? <IconRefresh size={15} /> : <IconSparkles size={15} />} loading={running} disabled={!name.trim()} onClick={run}>{plan ? 'Re-plan' : 'Plan'}</Button>
         </Group>
       </Box>
 
@@ -139,7 +139,7 @@ export default function GenericPlanner({ session }) {
             </Stack>
           </SimpleGrid>
           <Group justify="flex-end" gap="sm">
-            {session.status === 'planned' && <Button radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={<IconFolderPlus size={16} />} onClick={confirm}>Confirm — create project</Button>}
+            {session.status === 'planned' && <Button radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={<IconFolderPlus size={16} />} onClick={confirm}>Confirm — create project</Button>}
             {session.status === 'confirmed' && (
               <>
                 <Button radius="xl" variant="light" color="forest" onClick={() => setPanel('projects')}>Open the project</Button>

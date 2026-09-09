@@ -69,7 +69,7 @@ export function NoteEditor({ note, onClose }) {
             <Textarea radius="md" label="Action items (one per line)" autosize minRows={2}
               defaultValue={m.actions} onBlur={(e) => patchMeeting({ actions: e.currentTarget.value })} />
             <Button
-              size="xs" radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}
+              size="xs" radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
               leftSection={<IconSparkles size={14} />} loading={summarizing} onClick={summarize}
               style={{ alignSelf: 'flex-start' }}
             >
@@ -152,7 +152,7 @@ export default function NotesPanel() {
           return (
             <Box key={n.id} className="glass hover-lift" p="md" style={{ borderRadius: 14, cursor: 'pointer' }} onClick={() => setEditId(n.id)}>
               <Group gap={8} wrap="nowrap">
-                {n.type === 'idea' ? <IconBulb size={17} color="#f08c00" /> : <IconNotes size={17} color="#0f766e" />}
+                {n.type === 'idea' ? <IconBulb size={17} color="#f08c00" /> : <IconNotes size={17} color="#1b5a38" />}
                 <Box style={{ flex: 1 }}>
                   <Text fw={650} fz={14}>{n.title}</Text>
                   <Group gap={6} mt={2}>

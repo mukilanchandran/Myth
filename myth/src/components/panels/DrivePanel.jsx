@@ -208,10 +208,10 @@ export default function DrivePanel() {
   );
 
   return (
-    <Stack gap="sm" ref={dropRef} style={{ minHeight: '100%', outline: dragOver ? '2px dashed #12a150' : 'none', outlineOffset: -2, borderRadius: 16 }}>
+    <Stack gap="sm" ref={dropRef} style={{ minHeight: '100%', outline: dragOver ? '2px dashed #0D2D1C' : 'none', outlineOffset: -2, borderRadius: 16 }}>
       {/* actions */}
       <Group gap="xs">
-        <Button size="xs" radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={<IconUpload size={14} />} component="label">
+        <Button size="xs" radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={<IconUpload size={14} />} component="label">
           Upload
           <input type="file" hidden multiple onChange={(e) => { stageFiles(e.target.files); e.target.value = ''; }} />
         </Button>
@@ -232,7 +232,7 @@ export default function DrivePanel() {
       </Group>
 
       <Group gap={8} align="center">
-        <IconClipboardPlus size={15} color="#0f766e" />
+        <IconClipboardPlus size={15} color="#1b5a38" />
         <Text fz={12} c="dimmed"><Kbd size="xs">Ctrl</Kbd>+<Kbd size="xs">V</Kbd> pastes screenshots or copied text straight into the vault; files can be dropped anywhere here.</Text>
       </Group>
 

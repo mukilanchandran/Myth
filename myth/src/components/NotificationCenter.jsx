@@ -41,7 +41,7 @@ export default function NotificationCenter({ onNavigate }) {
   if (!list.length) {
     return (
       <Group gap={8} py={4}>
-        <IconCircleCheck size={18} color="#12a150" />
+        <IconCircleCheck size={18} color="#0D2D1C" />
         <Text fz={13} c="dimmed">All quiet — nothing worth interrupting you for.</Text>
       </Group>
     );

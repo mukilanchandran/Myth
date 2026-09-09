@@ -76,7 +76,7 @@ export default function Widgets({ onOpen }) {
       spacing="md" w="100%" maw={1400} mx="auto" px={{ base: 12, sm: 24 }}
     >
       {/* Focus today */}
-      <WidgetCard i={0} title="Focus today" icon={<IconTargetArrow size={17} color="#12a150" />} onClick={() => onOpen('tasks')}>
+      <WidgetCard i={0} title="Focus today" icon={<IconTargetArrow size={17} color="#0D2D1C" />} onClick={() => onOpen('tasks')}>
         {focus.length === 0 ? (
           <Text fz={13} c="dimmed">All clear — capture your next move above.</Text>
         ) : (
@@ -101,7 +101,7 @@ export default function Widgets({ onOpen }) {
         <Group gap="lg" align="center">
           <RingProgress
             size={78} thickness={8} roundCaps
-            sections={[{ value: stats.completionRate, color: '#12a150' }]}
+            sections={[{ value: stats.completionRate, color: '#0D2D1C' }]}
             label={<Text ta="center" fw={800} fz={15}>{stats.completionRate}%</Text>}
           />
           <Stack gap={4}>
@@ -116,7 +116,7 @@ export default function Widgets({ onOpen }) {
             style={{ borderTop: '1px solid rgba(20,60,40,0.12)' }}
             onClick={(e) => { e.stopPropagation(); onOpen('finance'); }}
           >
-            <IconWallet size={15} color="#0f766e" style={{ flexShrink: 0 }} />
+            <IconWallet size={15} color="#1b5a38" style={{ flexShrink: 0 }} />
             <Text fz={12.5} fw={600}>₹{stats.spent.toLocaleString('en-IN')} spent</Text>
             <Text fz={12.5} c={stats.savings >= 0 ? 'green' : 'red'}>
               net {stats.savings >= 0 ? '+' : '−'}₹{Math.abs(stats.savings).toLocaleString('en-IN')}
@@ -159,7 +159,7 @@ export default function Widgets({ onOpen }) {
               return (
                 <Group key={h.id} gap={8} onClick={(e) => e.stopPropagation()} wrap="nowrap">
                   <Checkbox size="xs" radius="xl" color="forest" checked={!!h.log[todayKey]} onChange={() => state.toggleHabit(h.id)} />
-                  <HIcon size={15} color="#0f766e" style={{ flexShrink: 0 }} />
+                  <HIcon size={15} color="#1b5a38" style={{ flexShrink: 0 }} />
                   <Text fz={13.5} lineClamp={1} td={h.log[todayKey] ? 'line-through' : undefined} opacity={h.log[todayKey] ? 0.6 : 1}>
                     {h.name}
                   </Text>

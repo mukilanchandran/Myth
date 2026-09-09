@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
 import { Box, TextInput, ActionIcon, Group, Text, Tooltip, Chip, Stack, Loader } from '@mantine/core';
 import {
   IconMicrophone, IconSend, IconMicrophoneFilled, IconListCheck,
-  IconRobotFace, IconX, IconTrash, IconArrowsDiagonal, IconHistory, IconPlus,
+  IconX, IconTrash, IconArrowsDiagonal, IconHistory, IconPlus,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +13,7 @@ import { parseMulti, executeCapture } from '../ai/parser';
 import { askAssistant } from '../ai/assistant';
 import { detectProjectIntent } from '../ai/projectPlanner';
 import DayPlan from './DayPlan';
+import MythBot from './MythBot';
 
 const CHAT_HINTS = [
   'What should I do now?',
@@ -46,6 +48,8 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
   const loadChatSession = useStore((s) => s.loadChatSession);
   const deleteChatSession = useStore((s) => s.deleteChatSession);
   const chatMode = barMode === 'chat';
+  // phones: smaller controls, shorter placeholder — the text field keeps its room
+  const mobile = useMediaQuery('(max-width: 768px)');
 
   // let the shell know the conversation is taking over the page
   useEffect(() => { onChatOpen?.(open); }, [open, onChatOpen]);
@@ -150,12 +154,12 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
   };
 
   return (
-    <Box w="100%" maw={720} mx="auto">
+    <Box w="100%" className="capture-wrap">
       <Box
-        className="glass-strong"
-        p={8}
-        pl={10}
-        style={{ borderRadius: 999, display: 'flex', alignItems: 'center', gap: 8 }}
+        className="glass-strong capture-bar"
+        p={mobile ? 6 : 10}
+        pl={mobile ? 8 : 14}
+        style={{ borderRadius: 999, display: 'flex', alignItems: 'center', gap: 10 }}
       >
         {/* Plan / Chatbot switch */}
         <Group
@@ -164,36 +168,36 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
         >
           <Tooltip label="Plan mode — I split what you type into tasks, calendar, plan, money…">
             <ActionIcon
-              size={32} radius="xl"
+              size={mobile ? 30 : 38} radius="xl"
               variant={!chatMode ? 'gradient' : 'subtle'}
-              gradient={{ from: '#12a150', to: '#0f766e' }}
+              gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
               color="forest"
               onClick={() => switchMode('plan')}
             >
-              <IconListCheck size={18} color={!chatMode ? '#fff' : '#12a150'} />
+              <IconListCheck size={18} color={!chatMode ? '#fff' : '#0D2D1C'} />
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Chatbot mode — talk to Myth AI (opens a fresh chat)">
             <ActionIcon
-              size={32} radius="xl"
+              size={mobile ? 30 : 38} radius="xl"
               variant={chatMode ? 'gradient' : 'subtle'}
-              gradient={{ from: '#12a150', to: '#0f766e' }}
+              gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
               color="forest"
               onClick={() => switchMode('chat')}
             >
-              <IconRobotFace size={18} color={chatMode ? '#fff' : '#12a150'} />
+              <MythBot size={mobile ? 28 : 36} active={chatMode} mood={thinking ? 'thinking' : 'idle'} />
             </ActionIcon>
           </Tooltip>
         </Group>
         <TextInput
           className="capture-input"
           variant="unstyled"
-          size="lg"
+          size={mobile ? 'md' : 'lg'}
           style={{ flex: 1 }}
           placeholder={
             listening ? 'Listening… speak now'
               : chatMode ? 'Ask me anything, Boss…'
-                : 'Plan anything — tasks, meetings, birthdays, money, habits…'
+                : mobile ? 'Plan anything…' : 'Plan anything — tasks, meetings, money, habits…'
           }
           value={value}
           onChange={(e) => setValue(e.currentTarget.value)}
@@ -201,7 +205,7 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
         />
         <Tooltip label={listening ? 'Stop listening' : chatMode ? 'Speak — ask Myth' : 'Speak — I will plan it'}>
           <ActionIcon
-            size={44}
+            size={mobile ? 40 : 52}
             radius="xl"
             variant={listening ? 'filled' : 'light'}
             color={listening ? 'red' : 'forest'}
@@ -212,7 +216,7 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
           </ActionIcon>
         </Tooltip>
         <ActionIcon
-          size={44} radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}
+          size={mobile ? 40 : 52} radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
           loading={thinking} onClick={() => submit()}
         >
           <IconSend size={19} />
@@ -231,7 +235,7 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
             <Box className="glass" mt={10} p={12} style={{ borderRadius: 20 }}>
               <Group justify="space-between" mb={8}>
                 <Group gap={6}>
-                  <IconRobotFace size={15} color="#12a150" />
+                  <MythBot size={22} active mood={thinking ? 'thinking' : 'idle'} />
                   <Text fz={12} fw={700} c="#0f5132">Myth AI</Text>
                 </Group>
                 <Group gap={2}>
@@ -273,7 +277,7 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
                           style={{ borderRadius: 12, background: 'rgba(255,255,255,0.72)', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.6)' }}
                           onClick={() => { loadChatSession(h.id); setShowHistory(false); }}
                         >
-                          <IconHistory size={13} color="#0f766e" style={{ flexShrink: 0 }} />
+                          <IconHistory size={13} color="#1b5a38" style={{ flexShrink: 0 }} />
                           <Box style={{ flex: 1, minWidth: 0 }}>
                             <Text fz={12.5} fw={600} c="#16281f" truncate>{sessionLabel(h)}</Text>
                             <Text fz={10.5} c="dimmed">{dayjs(h.ts).format('ddd, MMM D · h:mm A')}</Text>
@@ -302,7 +306,7 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
                         style={{
                           borderRadius: 14,
                           marginLeft: m.role === 'user' ? 'auto' : 0,
-                          background: m.role === 'user' ? 'linear-gradient(135deg,#12a150,#0f766e)' : 'rgba(255,255,255,0.82)',
+                          background: m.role === 'user' ? 'linear-gradient(135deg,#0D2D1C,#1b5a38)' : 'rgba(255,255,255,0.82)',
                           color: m.role === 'user' ? '#fff' : '#16281f',
                           border: '1px solid rgba(255,255,255,0.6)',
                         }}

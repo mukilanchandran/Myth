@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Group, Text, Stack, Badge, Button, Modal, Progress, SimpleGrid, Checkbox } from '@mantine/core';
 import {
-  IconCalendarTime, IconRobotFace, IconCheck, IconPlayerPlay, IconCalendarPlus,
+  IconRobotFace, IconCheck, IconPlayerPlay, IconCalendarPlus,
   IconArrowRight, IconCircleCheck, IconTargetArrow, IconTrash, IconBrain, IconArrowForwardUp,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -17,12 +17,13 @@ import { contextFor, createFollowUpTask } from '../ai/context';
 import { commandCenter, fmtDuration } from '../ai/commandCenter';
 import { aiPlanMessage } from '../ai/assistant';
 import { eventIcon } from '../icons';
+import Spot from './illustrations/Spot';
 import { APP_NAME } from '../config/env';
 import './commandCenter.css';
 
 // Live view of the store, re-evaluated every minute so "starts in 25 min"
 // and the now-marker keep moving even when nothing is edited.
-function useCommandCenter() {
+export function useCommandCenter() {
   const state = useStore();
   const [now, setNow] = useState(() => dayjs());
   useEffect(() => {
@@ -80,16 +81,21 @@ export function CommandHero({ mobile, children }) {
 }
 
 // ---------- shared card frame ----------
-function Card({ i, label, icon, color, accent, children, footer }) {
+// Tinted glass with a soft colour wash in the corner, an icon tile and a
+// label + subtitle — no borders or strokes; the accent lives in the tile,
+// the wash and the action pill.
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`; };
+
+function Card({ i, label, sub, icon, color, pulse, children, footer }) {
   return (
     <motion.div {...cardAnim(i)} style={{ height: '100%' }}>
-      <Box
-        className="glass" p="md" h="100%"
-        style={{ display: 'flex', flexDirection: 'column', borderRadius: 22, borderTop: accent ? `3px solid ${color}` : undefined }}
-      >
-        <Group gap={7} mb={10}>
-          {icon}
-          <Text fw={800} fz={12.5} tt="uppercase" lts={1.2} c={color}>{label}</Text>
+      <Box className="cc-card" p="md" h="100%" style={{ '--cc-accent': color, '--cc-wash': rgba(color, 0.24), '--cc-tile': rgba(color, 0.14) }}>
+        <Group gap={10} mb={12} wrap="nowrap">
+          <div className={`cc-tile${pulse ? ' pulse-red' : ''}`}>{icon}</div>
+          <div style={{ minWidth: 0 }}>
+            <Text className="cc-label">{label}</Text>
+            {sub && <Text className="cc-sub" lineClamp={1}>{sub}</Text>}
+          </div>
         </Group>
         <Box style={{ flex: 1, minHeight: 0 }}>{children}</Box>
         {footer && <Box mt={12}>{footer}</Box>}
@@ -98,42 +104,57 @@ function Card({ i, label, icon, color, accent, children, footer }) {
   );
 }
 
+// ---------- soft cards (the left column) ----------
+// A gradient wash, a title, one sentence that tells the story, a small
+// illustration in the corner — then the details and one action.
+function SoftCard({ i, title, desc, tone, art, children, footer }) {
+  return (
+    <motion.div {...cardAnim(i)}>
+      <div className="cc-soft" style={{ '--soft-a': tone[0], '--soft-b': tone[1] }}>
+        {art && <div className="cc-soft-art">{art}</div>}
+        <div className="cc-soft-title">{title}</div>
+        {desc && <div className="cc-soft-desc">{desc}</div>}
+        {children && <div className="cc-soft-body">{children}</div>}
+        {footer && <div className="cc-soft-foot">{footer}</div>}
+      </div>
+    </motion.div>
+  );
+}
+
 // ---------- NEEDS ATTENTION ----------
-function AttentionCard({ items, onHandle, i }) {
+export function AttentionCard({ items, onHandle, i }) {
   const top = items.slice(0, 3);
   const more = items.length - top.length;
   const urgent = items.some((x) => x.severity === 3);
-  const color = items.length ? '#e03131' : '#12a150';
+  const tone = items.length ? ['#fdece6', '#f6d4cc'] : ['#e6f5ec', '#d0ebdb'];
+  const desc = items.length === 0
+    ? 'Nothing is on fire. Clear runway — a good moment to pull something from the backlog.'
+    : `${items.length} thing${items.length === 1 ? '' : 's'} to decide${urgent ? ', one of them urgent' : ''}. Handle each now — done, start, or move it.`;
   return (
-    <Card
-      i={i} label="Needs attention" color={color} accent
-      icon={<Box w={9} h={9} className={urgent ? 'pulse-red' : undefined} style={{ borderRadius: '50%', background: color }} />}
+    <SoftCard
+      i={i} title="Needs attention" desc={desc} tone={tone}
+      art={<Spot kind={items.length ? 'generic' : 'tasks'} color={items.length ? '#e03131' : '#0D2D1C'} size={70} />}
       footer={items.length > 0 && (
-        <Button fullWidth radius="xl" color="red" variant="light" rightSection={<IconArrowRight size={15} />} onClick={onHandle}>
+        <Button fullWidth radius="xl" color="dark" variant="filled" rightSection={<IconArrowRight size={15} />} onClick={onHandle}>
           Handle these{items.length > 1 ? ` (${items.length})` : ''}
         </Button>
       )}
     >
-      {items.length === 0 ? (
-        <Group gap={8}>
-          <IconCircleCheck size={18} color="#12a150" />
-          <Text fz={13.5} c="dimmed">Nothing is on fire. Clear runway.</Text>
-        </Group>
-      ) : (
-        <Stack gap={8}>
+      {items.length > 0 && (
+        <Stack gap={6}>
           {top.map((it) => (
-            <Group key={it.id} gap={8} wrap="nowrap" align="flex-start">
-              <Box w={6} h={6} mt={7} style={{ borderRadius: 3, background: KIND_COLORS[it.kind] ?? '#868e96', flexShrink: 0 }} />
+            <Group key={it.id} className="cc-item" gap={8} wrap="nowrap" align="flex-start">
+              <Box w={8} h={8} mt={6} style={{ borderRadius: 4, background: KIND_COLORS[it.kind] ?? '#868e96', flexShrink: 0 }} />
               <div style={{ minWidth: 0 }}>
-                <Text fz={13.5} fw={600} lineClamp={1}>{it.title}</Text>
-                <Text fz={12} c={it.severity === 3 ? 'red' : 'dimmed'}>{it.sub}</Text>
+                <Text fz={13} fw={600} lineClamp={1}>{it.title}</Text>
+                <Text fz={11.5} c={it.severity === 3 ? 'red' : 'dimmed'} lineClamp={1}>{it.sub}</Text>
               </div>
             </Group>
           ))}
-          {more > 0 && <Text fz={12} c="dimmed">+{more} more</Text>}
+          {more > 0 && <Text fz={12} c="dimmed" pl={4}>+{more} more</Text>}
         </Stack>
       )}
-    </Card>
+    </SoftCard>
   );
 }
 
@@ -161,7 +182,7 @@ function TimelineRow({ item }) {
   );
 }
 
-function TodayCard({ items, now, onOpen, i }) {
+export function TodayCard({ items, now, onOpen, i }) {
   const n = now.hour() * 60 + now.minute();
   // the now-rule sits before the first item that hasn't started yet
   const rows = [];
@@ -172,22 +193,26 @@ function TodayCard({ items, now, onOpen, i }) {
   });
   if (!marked && items.some((it) => it.start != null)) rows.push({ marker: true });
 
+  const live = items.find((it) => it.status === 'now') ?? items.find((it) => it.status === 'next');
+  const desc = items.length
+    ? `${items.length} on the clock${live ? ` · ${live.status === 'now' ? 'now' : 'next'}: ${live.title}${live.time ? ` at ${live.time}` : ''}` : ''}.`
+    : 'Nothing on the clock yet. Follow the plan to block focus time, or add an event.';
+
   return (
-    <Card
-      i={i} label="Today" color="#1971c2" icon={<IconCalendarTime size={15} color="#1971c2" />}
+    <SoftCard
+      i={i} title={now.format('dddd, MMM D')} desc={desc} tone={['#e9e6fb', '#d5dbf5']}
+      art={<Spot kind="calendar" color="#5f3dc4" size={70} />}
       footer={(
-        <Button fullWidth radius="xl" variant="subtle" color="gray" size="xs" leftSection={<IconCalendarPlus size={14} />} onClick={() => onOpen('calendar')}>
+        <Button fullWidth radius="xl" variant="white" color="dark" leftSection={<IconCalendarPlus size={15} />} onClick={() => onOpen('calendar')}>
           Open calendar
         </Button>
       )}
     >
-      {items.length === 0 ? (
-        <Text fz={13.5} c="dimmed">Nothing on the clock yet. Follow the plan to block focus time, or add an event in the calendar.</Text>
-      ) : (
-        <Stack gap={0} className="cc-timeline scroll-y" style={{ maxHeight: 280 }}>
+      {items.length > 0 && (
+        <Stack gap={0} className="cc-timeline scroll-y" style={{ maxHeight: 160 }}>
           {rows.map((r, idx) => (r.marker ? (
             <Group key={`now-${idx}`} gap={6} wrap="nowrap" className="cc-now">
-              <Text fz={10.5} fw={800} w={44} ta="right" c="#12a150" style={{ fontVariantNumeric: 'tabular-nums' }}>{now.format('HH:mm')}</Text>
+              <Text fz={10.5} fw={800} w={44} ta="right" c="#0D2D1C" style={{ fontVariantNumeric: 'tabular-nums' }}>{now.format('HH:mm')}</Text>
               <div className="cc-now-rule" />
             </Group>
           ) : (
@@ -195,7 +220,7 @@ function TodayCard({ items, now, onOpen, i }) {
           )))}
         </Stack>
       )}
-    </Card>
+    </SoftCard>
   );
 }
 
@@ -204,14 +229,11 @@ function TodayCard({ items, now, onOpen, i }) {
 // Cached per plan shape (kind + task ids) so it isn't re-asked every minute.
 const aiLines = new Map();
 
-function MythCard({ plan, active, onOpen, i }) {
-  const applyPlan = useStore((s) => s.applyPlan);
-  const clearFocusBlocks = useStore((s) => s.clearFocusBlocks);
-  const completeTask = useStore((s) => s.completeTask);
-  const showActive = !!active && active.remaining > 0;
+// The line Myth says for a plan: the rule-based message, upgraded by the
+// model's phrasing when one answers. Shared by the card and the hero.
+export function useMythSays(plan, showActive) {
   const planKey = `${plan.kind}:${plan.blocks.map((b) => b.taskId).join(',')}`;
   const [, bump] = useState(0);
-
   useEffect(() => {
     if (showActive || !plan.blocks.length || aiLines.has(planKey)) return undefined;
     let alive = true;
@@ -222,8 +244,15 @@ function MythCard({ plan, active, onOpen, i }) {
     });
     return () => { alive = false; };
   }, [planKey, plan, showActive]);
+  return (!showActive && aiLines.get(planKey)) || plan.message;
+}
 
-  const message = (!showActive && aiLines.get(planKey)) || plan.message;
+function MythCard({ plan, active, onOpen, i }) {
+  const applyPlan = useStore((s) => s.applyPlan);
+  const clearFocusBlocks = useStore((s) => s.clearFocusBlocks);
+  const completeTask = useStore((s) => s.completeTask);
+  const showActive = !!active && active.remaining > 0;
+  const message = useMythSays(plan, showActive);
 
   const follow = () => {
     applyPlan(plan.blocks);
@@ -250,21 +279,23 @@ function MythCard({ plan, active, onOpen, i }) {
     );
   } else if (plan.blocks.length) {
     footer = (
-      <Button fullWidth radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} leftSection={<IconTargetArrow size={16} />} onClick={follow}>
+      <Button fullWidth radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} leftSection={<IconTargetArrow size={16} />} onClick={follow}>
         Follow {APP_NAME}&apos;s plan
       </Button>
     );
   } else if (plan.kind === 'winddown') {
-    footer = <Button fullWidth radius="xl" variant="light" color="forest" onClick={() => onOpen('habits')}>Close the day</Button>;
+    footer = <Button fullWidth radius="xl" variant="filled" color="forest" onClick={() => onOpen('habits')}>Close the day</Button>;
   } else {
-    footer = <Button fullWidth radius="xl" variant="light" color="forest" onClick={() => onOpen('tasks')}>Browse the backlog</Button>;
+    footer = <Button fullWidth radius="xl" variant="filled" color="forest" onClick={() => onOpen('tasks')}>Browse the backlog</Button>;
   }
 
   return (
-    <Card i={i} label={`${APP_NAME} says`} color="#12a150" icon={<IconRobotFace size={16} color="#12a150" />} footer={footer}>
+    <Card
+      i={i} label={`${APP_NAME} says`} color="#0D2D1C" icon={<IconRobotFace size={18} />} footer={footer}
+      sub={showActive ? `plan in motion · ${active.done}/${active.total} done` : plan.blocks.length ? `a plan for the next ${fmtDuration(plan.focusMinutes)}` : plan.kind === 'winddown' ? 'the day is winding down' : `${fmtDuration(plan.focusMinutes)} of open time`}
+    >
       {showActive ? (
         <Stack gap={8}>
-          <Text fz={13} c="dimmed">Plan in motion · {active.done}/{active.total} blocks done</Text>
           <Text className="cc-quote">
             {active.current
               ? `Now: ${active.current.title} until ${active.current.end}.${active.next ? ` Then ${active.next.title} at ${active.next.time}.` : ' Last block of the day.'}`
@@ -282,7 +313,7 @@ function MythCard({ plan, active, onOpen, i }) {
                   <Text fz={12.5} lineClamp={1} td={done ? 'line-through' : undefined} c={done || missed ? 'dimmed' : undefined} style={{ flex: 1 }}>
                     {b.title}
                   </Text>
-                  {done && <IconCheck size={13} color="#12a150" />}
+                  {done && <IconCheck size={13} color="#0D2D1C" />}
                   {missed && <Badge size="xs" color="gray" variant="light">missed</Badge>}
                 </Group>
               );
@@ -310,7 +341,7 @@ function MythCard({ plan, active, onOpen, i }) {
 }
 
 // ---------- "Handle these" ----------
-function TriageModal({ opened, onClose, items, onOpen }) {
+export function TriageModal({ opened, onClose, items, onOpen }) {
   const { completeTask, updateTask, toggleHabit, deleteEvent, habits } = useStore();
   const openContext = useUI((s) => s.openContext);
   const todayKey = dayjs().format('YYYY-MM-DD');
@@ -335,7 +366,7 @@ function TriageModal({ opened, onClose, items, onOpen }) {
     >
       {items.length === 0 ? (
         <Stack align="center" py="lg" gap={6}>
-          <IconCircleCheck size={34} color="#12a150" />
+          <IconCircleCheck size={34} color="#0D2D1C" />
           <Text fw={700}>All handled</Text>
           <Text fz={13} c="dimmed">Nothing needs your attention right now.</Text>
           <Button mt="sm" radius="xl" color="forest" onClick={onClose}>Back to the day</Button>

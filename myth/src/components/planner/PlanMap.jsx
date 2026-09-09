@@ -35,12 +35,12 @@ export default function PlanMap({ route, markers = [], pos = null, height = 260 
     const bounds = [];
     if (route?.geometry?.length) {
       const line = route.geometry.map((p) => [p.lat, p.lon]);
-      L.polyline(line, { color: '#0f766e', weight: 4, opacity: 0.85 }).addTo(layer);
+      L.polyline(line, { color: '#1b5a38', weight: 4, opacity: 0.85 }).addTo(layer);
       bounds.push(...line);
     }
     markers.forEach((m) => {
       if (m.lat == null) return;
-      L.circleMarker([m.lat, m.lon], { radius: m.radius ?? 6, color: '#fff', weight: 1.5, fillColor: m.color ?? '#12a150', fillOpacity: 0.95 })
+      L.circleMarker([m.lat, m.lon], { radius: m.radius ?? 6, color: '#fff', weight: 1.5, fillColor: m.color ?? '#0D2D1C', fillOpacity: 0.95 })
         .bindTooltip(m.label ?? '', { direction: 'top', offset: [0, -6] })
         .addTo(layer);
       bounds.push([m.lat, m.lon]);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Stack, Group, Text, Box, TextInput, ActionIcon, Loader, Button, Badge, Tooltip } from '@mantine/core';
-import { IconSend, IconRobotFace, IconTrash, IconHistory, IconPlus } from '@tabler/icons-react';
+import { IconSend, IconTrash, IconHistory, IconPlus } from '@tabler/icons-react';
+import MythBot from './MythBot';
 import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
@@ -79,7 +80,7 @@ export default function ChatAssistant({ initialQuestion, onConsumedInitial }) {
   return (
     <Stack gap="sm" h="100%" style={{ minHeight: 0 }}>
       <Group justify="space-between">
-        <Group gap={6}><IconRobotFace size={18} color="#12a150" /><Text fw={700} fz={14}>At your service, Boss — ask me anything</Text></Group>
+        <Group gap={8}><MythBot size={30} active mood={thinking ? 'thinking' : 'idle'} /><Text fw={700} fz={14}>At your service, Boss — ask me anything</Text></Group>
         <Group gap={6}>
           <Tooltip label={engine ? 'AI model connected — open-ended chat is live' : engine === false ? 'Connect a free AI in Settings → AI brain (Groq / OpenRouter / Gemini) — offline brain answers data questions' : 'Checking for an AI model…'}>
             <Badge size="sm" variant="light" color={engine ? 'grape' : engine === false ? 'gray' : 'blue'}>
@@ -113,7 +114,7 @@ export default function ChatAssistant({ initialQuestion, onConsumedInitial }) {
                   style={{ borderRadius: 14, background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.6)', cursor: 'pointer' }}
                   onClick={() => { loadChatSession(h.id); setShowHistory(false); }}
                 >
-                  <IconHistory size={15} color="#0f766e" style={{ flexShrink: 0 }} />
+                  <IconHistory size={15} color="#1b5a38" style={{ flexShrink: 0 }} />
                   <Box style={{ flex: 1, minWidth: 0 }}>
                     <Text fz={13} fw={600} truncate>{sessionLabel(h)}</Text>
                     <Text fz={11} c="dimmed">{dayjs(h.ts).format('ddd, MMM D · h:mm A')} · {h.messages.length} messages</Text>
@@ -144,7 +145,7 @@ export default function ChatAssistant({ initialQuestion, onConsumedInitial }) {
                     style={{
                       borderRadius: 16,
                       marginLeft: m.role === 'user' ? 'auto' : 0,
-                      background: m.role === 'user' ? 'linear-gradient(135deg,#12a150,#0f766e)' : 'rgba(255,255,255,0.75)',
+                      background: m.role === 'user' ? 'linear-gradient(135deg,#0D2D1C,#1b5a38)' : 'rgba(255,255,255,0.75)',
                       color: m.role === 'user' ? '#fff' : '#16281f',
                       border: '1px solid rgba(255,255,255,0.6)',
                     }}
@@ -168,7 +169,7 @@ export default function ChatAssistant({ initialQuestion, onConsumedInitial }) {
           value={value} onChange={(e) => setValue(e.currentTarget.value)}
           onKeyDown={(e) => e.key === 'Enter' && ask()}
         />
-        <ActionIcon size={38} radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} onClick={() => ask()}>
+        <ActionIcon size={38} radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} onClick={() => ask()}>
           <IconSend size={17} />
         </ActionIcon>
       </Group>

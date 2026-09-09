@@ -72,7 +72,7 @@ export default function Login() {
                   onKeyDown={onEnter}
                   leftSection={
                     unlocking
-                      ? <IconLockOpen size={18} color="#12a150" />
+                      ? <IconLockOpen size={18} color="#0D2D1C" />
                       : <IconLock size={18} />
                   }
                   error={error ? 'Wrong password — keep typing' : null}
@@ -81,7 +81,7 @@ export default function Login() {
                   styles={{
                     input: {
                       background: 'rgba(255,255,255,0.65)',
-                      border: unlocking ? '1.5px solid #12a150' : '1px solid rgba(255,255,255,0.9)',
+                      border: unlocking ? '1.5px solid #0D2D1C' : '1px solid rgba(255,255,255,0.9)',
                       transition: 'border 200ms ease',
                     },
                   }}

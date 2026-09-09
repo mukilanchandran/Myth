@@ -45,7 +45,7 @@ export default function TodayPanel() {
       <Box className="glass" p="lg" style={{ borderRadius: 18 }}>
         <Group justify="space-between" mb={6}>
           <Text fw={800} fz={16}>Productivity score</Text>
-          <Badge size="lg" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}>{score}/100</Badge>
+          <Badge size="lg" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}>{score}/100</Badge>
         </Group>
         <Progress value={score} size={10} radius="xl" color="forest" mb={8} />
         <Text fz={12.5} c="dimmed">
@@ -56,7 +56,7 @@ export default function TodayPanel() {
       {plan && (
         <Box className="glass" p="md" style={{ borderRadius: 16 }}>
           <Group gap={6} mb={4}>
-            <IconTargetArrow size={15} color="#12a150" />
+            <IconTargetArrow size={15} color="#0D2D1C" />
             <Text fw={700} fz={13.5}>Myth suggests</Text>
           </Group>
           <Text fz={13} style={{ whiteSpace: 'pre-line' }}>{plan}</Text>

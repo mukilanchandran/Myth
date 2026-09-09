@@ -150,7 +150,7 @@ export default function PlannerPanel() {
           </>
         ) : (
           <Box className="glass" p="lg" style={{ borderRadius: 18, textAlign: 'center' }}>
-            <IconCompass size={34} color="#12a150" />
+            <IconCompass size={34} color="#0D2D1C" />
             <Text fw={800} fz={18} mt={6}>What are we planning, Boss?</Text>
             <Text fz={13} c="dimmed" mt={4} maw={520} mx="auto">One sentence is enough. {APP_NAME} works out the mode — trip, event, exam, fitness, launch, move — and builds the plan: itineraries with weather, stays and fuel for trips; dated milestones and tasks for everything else. Confirm to make it real, then go live for day-by-day guidance.</Text>
             <Group justify="center" gap={6} mt="md">
@@ -171,7 +171,7 @@ export default function PlannerPanel() {
           )}
           <Group gap={6} wrap="nowrap">
             <TextInput radius="xl" style={{ flex: 1 }} placeholder={active ? `Tell ${APP_NAME} what to change… ("budget 40k", "start trip")` : `Tell ${APP_NAME} what you're planning…`} value={text} onChange={(e) => setText(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
-            <ActionIcon size={38} radius="xl" variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }} onClick={() => submit()}><IconSend size={17} /></ActionIcon>
+            <ActionIcon size={38} radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }} onClick={() => submit()}><IconSend size={17} /></ActionIcon>
           </Group>
         </Box>
       </Stack>

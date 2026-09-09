@@ -11,6 +11,7 @@ import {
 import { DateInput } from '@mantine/dates';
 import dayjs from 'dayjs';
 import { useStore, uid } from '../../store/useStore';
+import EmptyState from '../EmptyState';
 import { putBlob, getBlob, deleteBlob, downloadBlob } from '../../store/fileStore';
 import { NoteEditor } from './NotesPanel';
 
@@ -253,7 +254,7 @@ export default function ProjectsPanel() {
   const { projects, tasks, addProject, deleteProject } = useStore();
   const [openId, setOpenId] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', desc: '', deadline: null, color: '#12a150' });
+  const [form, setForm] = useState({ name: '', desc: '', deadline: null, color: '#0D2D1C' });
   const mine = projects;
   const open = mine.find((p) => p.id === openId);
 
@@ -267,7 +268,7 @@ export default function ProjectsPanel() {
       deadline: form.deadline ? dayjs(form.deadline).format('YYYY-MM-DD') : null,
       color: form.color,
     });
-    setForm({ name: '', desc: '', deadline: null, color: '#12a150' });
+    setForm({ name: '', desc: '', deadline: null, color: '#0D2D1C' });
     setCreating(false);
     setOpenId(p.id);
   };
@@ -277,7 +278,7 @@ export default function ProjectsPanel() {
   return (
     <Stack gap="md">
       <Button
-        radius="xl" leftSection={<IconPlus size={16} />} variant="gradient" gradient={{ from: '#12a150', to: '#0f766e' }}
+        radius="xl" leftSection={<IconPlus size={16} />} variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
         onClick={() => setCreating(true)}
       >
         New project
@@ -311,7 +312,7 @@ export default function ProjectsPanel() {
           </Button>
         </Stack>
       </Modal>
-      {mine.length === 0 && <Text c="dimmed" ta="center" py="xl" fz={14}>No projects yet. A project holds tasks, meeting notes, documents & designs in one place.</Text>}
+      {mine.length === 0 && <EmptyState kind="projects" color="#e8590c" title="No projects yet" hint="A project holds tasks, milestones, meeting notes and documents in one place. Say what you're launching and Myth drafts one." />}
       {mine.map((p) => {
         const pt = tasks.filter((t) => t.projectId === p.id);
         const pct = pt.length ? Math.round((pt.filter((t) => t.status === 'done').length / pt.length) * 100) : 0;

@@ -3,6 +3,7 @@ import { Stack, Group, Text, ActionIcon, TextInput, Button, Box, RingProgress, T
 import { IconPlus, IconTrash, IconFlame } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useStore } from '../../store/useStore';
+import EmptyState from '../EmptyState';
 import { HABIT_ICONS, habitIcon } from '../../icons';
 
 export default function HabitsPanel() {
@@ -44,7 +45,7 @@ export default function HabitsPanel() {
         </Group>
       </Box>
 
-      {habits.length === 0 && <Text c="dimmed" ta="center" py="xl" fz={14}>Build your streaks — add a habit above.</Text>}
+      {habits.length === 0 && <EmptyState kind="habits" color="#0ca678" title="Build your streaks" hint="Add a habit above — small daily wins compound." />}
 
       {habits.map((h) => {
         const HIcon = habitIcon(h.icon);
@@ -74,7 +75,7 @@ export default function HabitsPanel() {
                 </div>
               </Group>
               <Group gap={6}>
-                <RingProgress size={44} thickness={5} roundCaps sections={[{ value: rate, color: rate >= 70 ? '#12a150' : rate >= 40 ? '#f08c00' : '#e03131' }]} />
+                <RingProgress size={44} thickness={5} roundCaps sections={[{ value: rate, color: rate >= 70 ? '#0D2D1C' : rate >= 40 ? '#f08c00' : '#e03131' }]} />
                 <ActionIcon variant="subtle" color="red" onClick={() => deleteHabit(h.id)}><IconTrash size={15} /></ActionIcon>
               </Group>
             </Group>
@@ -90,8 +91,8 @@ export default function HabitsPanel() {
                       style={{
                         width: 40, height: 48, borderRadius: 12, cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        background: done ? 'linear-gradient(135deg,#12a150,#0f766e)' : 'rgba(255,255,255,0.5)',
-                        border: isToday ? '2px solid #0f766e' : '1px solid rgba(20,60,40,0.15)',
+                        background: done ? 'linear-gradient(135deg,#0D2D1C,#1b5a38)' : 'rgba(255,255,255,0.5)',
+                        border: isToday ? '2px solid #1b5a38' : '1px solid rgba(20,60,40,0.15)',
                         color: done ? '#fff' : '#334',
                         transition: 'all 140ms ease',
                       }}

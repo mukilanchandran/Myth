@@ -28,7 +28,7 @@ export function seedIfNeeded(store) {
   const d = (n) => dayjs().add(n, 'day').format('YYYY-MM-DD');
 
   // --- projects ---
-  const p1 = s.addProject({ name: 'Myth Platform', desc: 'Personal OS — design & build', color: '#12a150' });
+  const p1 = s.addProject({ name: 'Myth Platform', desc: 'Personal OS — design & build', color: '#0D2D1C' });
   const p2 = s.addProject({ name: 'Client Dashboard Redesign', desc: 'SaaS analytics dashboard UX revamp', color: '#1971c2' });
   const p3 = s.addProject({ name: 'Home Renovation', desc: 'Hall + balcony refresh', color: '#e8590c' });
 

@@ -1,23 +1,69 @@
 /* Life Command Center — home screen cards */
 
+/* the card: tinted glass, no border, a soft colour wash in the top-left corner */
+.cc-card {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.74);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow: 0 18px 50px rgba(5, 15, 25, 0.28);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.cc-card::before {
+  content: ''; position: absolute; top: -110px; left: -70px; width: 300px; height: 300px; border-radius: 50%;
+  background: radial-gradient(closest-side, var(--cc-wash), transparent);
+  pointer-events: none;
+}
+.cc-card::after {
+  content: ''; position: absolute; right: -80px; bottom: -120px; width: 240px; height: 240px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.55), transparent);
+  pointer-events: none;
+}
+.cc-card > * { position: relative; z-index: 1; }
+.cc-card:hover { transform: translateY(-2px); box-shadow: 0 22px 60px rgba(15, 40, 30, 0.3); }
+
+.cc-tile {
+  width: 38px; height: 38px; border-radius: 13px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: var(--cc-tile); color: var(--cc-accent);
+}
+.cc-label { font-weight: 800; font-size: 12.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--cc-accent); line-height: 1.2; }
+.cc-sub { font-size: 11.5px; font-weight: 600; color: rgba(22, 40, 31, 0.62); margin-top: 1px; }
+
+/* attention rows read as soft chips */
+.cc-item { background: rgba(255, 255, 255, 0.58); border-radius: 13px; padding: 7px 10px; }
+
 @keyframes pulseRed {
   0%, 100% { box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.45); }
   50% { box-shadow: 0 0 0 7px rgba(224, 49, 49, 0); }
 }
 .pulse-red { animation: pulseRed 2s ease infinite; }
 
-/* timeline rows: time column stays aligned, the "now" rule glows softly */
+/* timeline: a faint rail behind the icons, the "now" rule glows softly */
+.cc-timeline { position: relative; }
+.cc-timeline::before {
+  content: ''; position: absolute; left: 56px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px;
+  background: rgba(20, 60, 40, 0.1);
+}
 .cc-timeline .cc-row { transition: opacity 160ms ease; }
+.cc-timeline .cc-row svg { background: rgba(255, 255, 255, 0.9); border-radius: 50%; padding: 1px; }
 .cc-timeline .cc-now { padding: 4px 0; }
 .cc-timeline .cc-now-rule {
   flex: 1; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, #12a150, rgba(18, 161, 80, 0.15));
+  background: linear-gradient(90deg, #0D2D1C, rgba(13, 45, 28, 0.15));
 }
 
-/* the recommendation reads like a spoken line */
+/* the recommendation is a speech bubble, not a quotation */
 .cc-quote {
-  font-size: 15px; line-height: 1.45; font-weight: 500;
-  color: var(--ink);
+  font-size: 15px; line-height: 1.45; font-weight: 500; color: var(--ink);
+  background: rgba(255, 255, 255, 0.62);
+  border-radius: 16px 16px 16px 5px;
+  padding: 10px 13px;
 }
-.cc-quote::before { content: '\201C'; opacity: 0.35; margin-right: 2px; }
-.cc-quote::after { content: '\201D'; opacity: 0.35; margin-left: 2px; }
+
+@media (max-width: 768px) {
+  .cc-card { backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4); border-radius: 22px; }
+  .cc-card:hover { transform: none; }
+}

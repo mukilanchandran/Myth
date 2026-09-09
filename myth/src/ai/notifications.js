@@ -177,7 +177,7 @@ export function smartNotifications(state, now = dayjs()) {
     if (need <= freeUntil) return;
     out.push({
       key: `deadline:${p.id}`, fp: `${pt.length}/${need}/${freeUntil}`, kind: 'deadline', level: diff <= 2 ? 'act' : 'plan', ref: { type: 'project', id: p.id },
-      headline: `"${p.name}" won’t make ${relDay(p.deadline).toLowerCase()} at this pace.`,
+      headline: `"${p.name}" won’t make ${relDay(p.deadline, now).toLowerCase()} at this pace.`,
       lines: [
         `${plural(pt.length, 'open task')} need ~${fmtDuration(need)}; only ${fmtDuration(freeUntil)} is free before then.`,
         'Cut scope, move tasks out or push the deadline — decide now rather than on the day.',
@@ -230,7 +230,7 @@ export function smartNotifications(state, now = dayjs()) {
       key: `followup:${id}`, fp: String(openOwn), kind: 'followup', level: 'plan', contextId: id,
       headline: `No follow-up after "${ctx.node.label}" yet.`,
       lines: [
-        `You met ${relDay(ctx.when.date).toLowerCase()}${openOwn ? `; ${plural(openOwn, 'action item')} from it ${openOwn === 1 ? 'is' : 'are'} still open` : ''}.`,
+        `You met ${relDay(ctx.when.date, now).toLowerCase()}${openOwn ? `; ${plural(openOwn, 'action item')} from it ${openOwn === 1 ? 'is' : 'are'} still open` : ''}.`,
         'A one-line follow-up keeps the thread alive — Myth can add the task.',
       ],
       action: { type: 'followup', id, label: 'Add follow-up task' },
