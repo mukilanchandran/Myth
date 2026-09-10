@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Stack, Group, Text, TextInput, Switch, Box, Button, Divider, Code, PasswordInput, Badge, Select, Anchor } from '@mantine/core';
-import { IconDownload, IconUpload, IconTrash, IconRefresh, IconSparkles, IconExternalLink, IconBellRinging, IconBellCheck, IconDatabase, IconFiles } from '@tabler/icons-react';
+import { IconDownload, IconUpload, IconTrash, IconRefresh, IconSparkles, IconExternalLink, IconBellRinging, IconBellCheck, IconDatabase, IconFiles, IconLink } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useStore } from '../../store/useStore';
 import {
@@ -10,6 +10,7 @@ import {
 import { detectAI, streamChat, pickModel, OLLAMA_DEFAULT } from '../../ai/ollama';
 import { PROVIDERS, providerFor } from '../../ai/providers';
 import * as cloud from '../../cloud/netlify';
+import { autoSync } from '../../cloud/autoSync';
 import NotificationPrefs from './NotificationPrefs';
 
 function NotificationSection({ settings, setSettings }) {
@@ -299,10 +300,10 @@ function CloudSection({ settings, setSettings }) {
         </Badge>
       </Group>
       <Text fz={12.5} c="dimmed" mb="sm">
-        Back up all platform data and project documents to this site's own Netlify storage (Free plan, no card, no extra
-        account) and move between devices. Setup once: in Netlify open <b>Site configuration → Environment variables</b>,
-        add <Code>MYTH_SYNC_KEY</Code> = a long passphrase you invent (12+ characters), trigger a new deploy, then paste
-        the same passphrase here. The same key on another device opens the same cloud copy.
+        Once a sync key is set, sync is automatic: every change is pushed within seconds, and each device pulls the latest
+        copy when it opens or comes back to the front. The same key on any device shows the same data. Setup once: in
+        Netlify open <b>Site configuration → Environment variables</b>, add <Code>MYTH_SYNC_KEY</Code> = a long passphrase
+        you invent (12+ characters), trigger a new deploy, then paste the same passphrase here.
       </Text>
       <Stack gap="sm">
         <Group gap="xs" align="flex-end" wrap="nowrap">
@@ -331,11 +332,23 @@ function CloudSection({ settings, setSettings }) {
               {status.backup?.updatedAt ? ` · last cloud backup ${new Date(status.backup.updatedAt).toLocaleString()}` : ' · no cloud backup yet'}
             </Text>
             <Group gap="xs">
+              <Button
+                size="xs" radius="xl" color="forest" leftSection={<IconLink size={14} />}
+                onClick={() => {
+                  const link = `${(settings.cloudUrl || window.location.origin).replace(/\/+$/, '')}/?sync=${encodeURIComponent(settings.cloudKey.trim())}`;
+                  navigator.clipboard?.writeText(link).then(
+                    () => notifications.show({ color: 'green', title: 'Device link copied', message: 'Open it once on another phone or laptop — it connects by itself. Anyone with this link can see your data, so share it only with yourself.' }),
+                    () => prompt('Copy this link and open it on the other device:', link),
+                  );
+                }}
+              >
+                Copy device link
+              </Button>
               <Button size="xs" radius="xl" variant="light" color="forest" leftSection={<IconUpload size={14} />} loading={busy} onClick={doUpload}>
-                Upload to cloud
+                Push now
               </Button>
               <Button size="xs" radius="xl" variant="light" leftSection={<IconDownload size={14} />} loading={busy} onClick={doDownload}>
-                Download to this device
+                Pull cloud copy
               </Button>
               <Button size="xs" radius="xl" variant="subtle" color="gray" disabled={busy} onClick={doDisconnect}>Disconnect</Button>
             </Group>
@@ -433,11 +446,20 @@ export default function SettingsPanel() {
     input.click();
   };
 
-  const resetAll = () => {
-    if (confirm('This wipes ALL your Myth data on this device. Export a backup first. Continue?')) {
-      localStorage.removeItem('myth-db');
+  const resetAll = async () => {
+    const synced = cloud.isConfigured(settings);
+    const msg = synced
+      ? 'This erases ALL your Myth data — on this device, in the cloud, and on every device that syncs with it. Export a backup first. Continue?'
+      : 'This wipes ALL your Myth data on this device. Export a backup first. Continue?';
+    if (!confirm(msg)) return;
+    try {
+      if (synced) await cloud.deleteCloudFiles(settings).catch(() => {});
+      useStore.getState().resetData();      // empties every collection; auto-sync pushes the empty copy
+      if (synced) await autoSync()?.flush();
       indexedDB.deleteDatabase('myth-files');
-      window.location.reload();
+      notifications.show({ color: 'green', title: 'Erased', message: synced ? 'Everything is gone here and in the cloud. Other devices empty on their next open.' : 'This device is empty.' });
+    } catch (e) {
+      notifications.show({ color: 'red', title: 'Could not erase', message: e.message });
     }
   };
 

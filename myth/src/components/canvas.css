@@ -48,6 +48,16 @@
 /* home: the hero with the two decision cards stacked beside it */
 .home-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; align-items: start; flex-shrink: 0; }
 
+/* ---------- cloud sync ---------- */
+.connect-banner {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 18px; flex-shrink: 0;
+  background: #fff; color: #0f1f17; box-shadow: var(--card-shadow); max-width: 640px; margin: 0 auto; width: 100%;
+}
+.connect-banner > svg { color: #1971c2; flex-shrink: 0; margin-top: 2px; }
+.connect-close { border: none; background: #f0f4f1; border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; cursor: pointer; color: #5a6b62; flex-shrink: 0; }
+@keyframes syncSpin { to { transform: rotate(360deg); } }
+.sync-badge.is-spinning svg { animation: syncSpin 1.4s linear infinite; }
+
 /* ---------- the welcome above the capture bar ---------- */
 .welcome { text-align: center; color: #fff; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.5); flex-shrink: 0; padding: 0 12px; }
 .welcome-h { font-size: 30px; font-weight: 800; letter-spacing: -0.4px; line-height: 1.1; margin: 0; }

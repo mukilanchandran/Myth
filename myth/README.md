@@ -202,9 +202,22 @@ It is part of Netlify's Free plan: no second account, no credit card. One-time s
 4. Open the app from its Netlify address: **Settings → Cloud storage & sync** → paste the
    same passphrase → **Connect**.
 
-Then use **Upload to cloud** after working, and **Download to this device** on any other
-device (or after a browser wipe). Uploaded project documents ride along automatically, and
-the app quietly backs itself up once a day while a key is set.
+From then on **sync is automatic**: every change is pushed within a few seconds, and each
+device pulls the latest copy when it opens, comes back to the front, or every two minutes.
+The cloud icon in the top bar shows the state (off, syncing, synced, offline, problem).
+Uploaded project documents ride along automatically.
+
+- **Adding a device:** open the app there and paste the passphrase into the banner on the
+  home screen, or use **Settings → Copy device link** on a connected device and open that
+  link once on the new one — it connects by itself. The link contains the key; keep it to
+  yourself.
+- **First connection with data on both sides** (this device and the cloud both have items)
+  asks which copy to keep; the other is replaced everywhere. Asked once per device.
+- **Conflicts:** last write wins per snapshot. Because every device pulls when it comes to
+  the front, only two devices editing at the very same minute can lose the earlier edit.
+- **Erase:** **Settings → Reset everything** empties this device and the cloud; other devices
+  empty on their next open. New installs start empty — there is no demo data.
+- **Push now / Pull cloud copy** in Settings remain for manual control.
 
 How it holds up: the sync key never ships in the bundle (it is not a `VITE_*` value) — it
 lives in Netlify's environment and in each device's own settings. Objects are stored under

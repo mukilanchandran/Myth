@@ -359,6 +359,22 @@ export const useStore = create(
         return result;
       },
 
+      // ---------- cloud sync status (session-only, driven by cloud/autoSync.js) ----------
+      syncState: 'off', // off | syncing | synced | conflict | offline | error
+      syncError: null,
+      lastSyncAt: null,
+      syncConflict: null,
+      // Empty every collection (settings and the sync key stay). With auto-sync
+      // on, the empty snapshot is pushed, so every other device empties too.
+      resetData: () =>
+        set((s) => ({
+          tasks: [], projects: [], notes: [], files: [], drive: [], habits: [], transactions: [], journal: [],
+          plans: {}, learning: [], events: [], plannerSessions: [], chat: [], chatHistory: [], notifyMuted: {},
+          nowSession: null, pendingProposal: null,
+          xp: { points: 0, streakCount: 0, streakLastDate: null },
+          settings: { ...s.settings, seeded: true, seededV2: true, seededV3: true },
+        })),
+
       // ---------- Myth Planner (trips, events, study… see ai/planner.js) ----------
       // One session per plan: draft → planned → confirmed → live → done.
       plannerSessions: [],
@@ -416,7 +432,7 @@ export const useStore = create(
       name: 'myth-db',
       version: 7,
       // ask for the password on every visit — auth state is session-only
-      partialize: (s) => Object.fromEntries(Object.entries(s).filter(([k]) => k !== 'authed' && k !== 'pendingProposal')),
+      partialize: (s) => Object.fromEntries(Object.entries(s).filter(([k]) => !['authed', 'pendingProposal', 'syncState', 'syncError', 'lastSyncAt', 'syncConflict'].includes(k))),
       migrate: (persisted, version) => {
         if (version < 2 && persisted?.settings) {
           // v2: auto-select the best installed model instead of a hardcoded one

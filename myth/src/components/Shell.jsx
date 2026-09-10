@@ -10,9 +10,9 @@ import { IconChecklist, IconFolders, IconNotes, IconCalendarEvent, IconSearch } 
 import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { seedIfNeeded } from '../store/seed';
+import { startAutoSync } from '../cloud/autoSync';
+import { ConnectBanner, ConflictDialog } from './CloudConnect';
 import { runReminderNotifications } from '../notify';
-import * as cloud from '../cloud/netlify';
 import TopBar from './TopBar';
 import CaptureBar from './CaptureBar';
 import { useCommandCenter, AttentionCard, TodayCard, TriageModal } from './CommandCenter';
@@ -86,26 +86,12 @@ export default function Shell() {
   const [nowOpen, setNowOpen] = useState(false); // MITH NOW sheet
 
   useEffect(() => {
-    // no popup after login — reminders live quietly in the bell icon
-    seedIfNeeded(useStore);
     // chat history is short-lived by design: anything older than 3 days goes
     useStore.getState().pruneChat();
-  }, []);
-
-  // quiet daily cloud backup (when a sync key is set) — keeps the background
-  // push digest computed from fresh data instead of a stale snapshot
-  useEffect(() => {
-    const id = setTimeout(async () => {
-      const s = useStore.getState().settings;
-      if (!cloud.isConfigured(s)) return;
-      const today = dayjs().format('YYYY-MM-DD');
-      if (localStorage.getItem('myth-autosync') === today) return;
-      try {
-        await cloud.syncUp(s); // validates the key first; throws if the cloud is unreachable
-        localStorage.setItem('myth-autosync', today);
-      } catch { /* silent — manual sync still available in Settings */ }
-    }, 8000);
-    return () => clearTimeout(id);
+    // cloud: pull on open and on focus, push on every change — the same data
+    // on every device that opens the link (see cloud/autoSync.js)
+    const sync = startAutoSync(useStore);
+    return () => sync.stop();
   }, []);
 
   // system notifications + icon badge: on open, on return to foreground,
@@ -174,6 +160,8 @@ export default function Shell() {
     <div className="home">
       {/* "Hey Boss, good afternoon" + one small line for the day */}
       <Welcome />
+      {/* a device without a sync key yet: paste the passphrase once */}
+      <ConnectBanner />
       <CaptureBar onExpand={() => setPanel('assistant')} onChatOpen={setInlineChat} />
       {!inlineChat && (
         <>
@@ -262,6 +250,9 @@ export default function Shell() {
 
       {/* Automatic project creation: the "I drafted a plan — Create project?" sheet */}
       <ProjectProposal />
+
+      {/* first connection with data on both sides: keep which copy? */}
+      <ConflictDialog />
 
       <Spotlight
         actions={spotlightActions}

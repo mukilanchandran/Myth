@@ -8,7 +8,7 @@
 // Access is a single *sync key*: set MYTH_SYNC_KEY in Netlify's environment
 // variables and paste the same value here (Settings → Cloud storage & sync).
 // Same key on another device = same cloud copy.
-import { getBlob, putBlob } from '../store/fileStore';
+import { getBlob, putBlob } from '../store/fileStore.js';
 
 const DB_KEY = 'myth-db'; // zustand persist key — the exact JSON we back up
 const PART_BYTES = 4 * 1024 * 1024;
@@ -142,6 +142,39 @@ export async function syncDown(settings, onProgress) {
 
   localStorage.setItem(DB_KEY, text);
   return { files: downloaded };
+}
+
+/**
+ * Fetch the cloud copy without touching local storage: downloads document
+ * blobs this device is missing and returns the parsed backup. Used by
+ * auto-sync, which applies the state in place instead of reloading.
+ */
+export async function fetchBackup(settings) {
+  const status = await connect(settings);
+  if (!status.backup) return null;
+  const { blob } = await downloadObject(settings, BACKUP_ID);
+  const text = await blob.text();
+  const data = JSON.parse(text);
+  const metas = data?.state?.files ?? [];
+  const inCloud = new Set(status.files.map((f) => f.id));
+  let downloaded = 0;
+  for (const meta of metas) {
+    if (!inCloud.has(FILE_PREFIX + meta.id)) continue;
+    if (await getBlob(meta.id)) continue;
+    const { blob: fileBlob } = await downloadObject(settings, FILE_PREFIX + meta.id);
+    await putBlob(meta.id, fileBlob);
+    downloaded++;
+  }
+  return { text, data, updatedAt: status.backup.updatedAt, downloaded };
+}
+
+/** Remove every document object from the cloud (the backup itself is replaced by the next push). */
+export async function deleteCloudFiles(settings) {
+  const status = await connect(settings);
+  for (const f of status.files) {
+    try { await call(settings, `objects/${f.id}`, { method: 'DELETE' }); } catch { /* best effort */ }
+  }
+  return status.files.length;
 }
 
 // ---- storage status ----

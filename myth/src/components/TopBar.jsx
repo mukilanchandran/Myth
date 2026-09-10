@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore';
 import { visibleNotifications } from '../ai/notifications.js';
 import NotificationCenter from './NotificationCenter';
 import WeatherChip from './Weather';
+import SyncBadge from './SyncBadge';
 import { asset, APP_NAME } from '../config/env';
 
 export default function TopBar({ onOpen, desktop }) {
@@ -27,6 +28,7 @@ export default function TopBar({ onOpen, desktop }) {
 
       <div className="canvas-top-actions">
         <Box visibleFrom="sm"><WeatherChip /></Box>
+        <SyncBadge />
 
         <Tooltip label="Search everything (Ctrl K)">
           <button type="button" className="canvas-icon-btn" onClick={spotlight.open} aria-label="Search">
