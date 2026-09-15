@@ -1,12 +1,13 @@
-// The app frame. Desktop: a dashboard canvas — the capture bar, then the hero
-// with the two decision cards beside it (or an opened module), with the icon
-// rail on the right. Phones and tablets: the same pieces stacked, with a
-// floating tab bar and bottom sheets for modules.
+// The app frame. Desktop: a dashboard canvas — the home bar (Myth AI /
+// Planner on its tabs) with the Myth AI box under it, then the hero with the
+// two decision cards beside it, the Planner inline, or an opened module, with
+// the icon rail on the right and the floating Myth AI in every module. Phones
+// and tablets: the same pieces stacked, with a floating tab bar and bottom sheets.
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Drawer, Modal, Text } from '@mantine/core';
+import { Box, Drawer, Modal, Text, Tooltip, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Spotlight } from '@mantine/spotlight';
-import { IconChecklist, IconFolders, IconNotes, IconCalendarEvent, IconSearch } from '@tabler/icons-react';
+import { IconChecklist, IconFolders, IconNotes, IconCalendarEvent, IconSearch, IconCompass, IconX, IconArrowsDiagonal, IconBellRinging } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
@@ -16,7 +17,6 @@ import { runReminderNotifications } from '../notify';
 import TopBar from './TopBar';
 import CaptureBar from './CaptureBar';
 import { useCommandCenter, AttentionCard, TodayCard, TriageModal } from './CommandCenter';
-import ContextStrip from './ContextStrip';
 import MithNowSheet from './MithNow';
 import ProjectProposal from './ProjectProposal';
 import PlannerPanel from './planner/PlannerPanel';
@@ -26,10 +26,9 @@ import Rail from './Rail';
 import ModuleFrame from './ModuleFrame';
 import MobileNav from './MobileNav';
 import ChatAssistant from './ChatAssistant';
-import { keepModelWarm } from '../ai/assistant';
-import { AI_WARMUP, asset } from '../config/env';
+import AssistantDock from './AssistantDock';
+import { asset } from '../config/env';
 import TodayPanel from './panels/TodayPanel';
-import ContextPanel from './panels/ContextPanel';
 import TasksPanel from './panels/TasksPanel';
 import ProjectsPanel from './panels/ProjectsPanel';
 import NotesPanel from './panels/NotesPanel';
@@ -40,26 +39,27 @@ import CalendarPanel from './panels/CalendarPanel';
 import DrivePanel from './panels/DrivePanel';
 import ReportsPanel from './panels/ReportsPanel';
 import SettingsPanel from './panels/SettingsPanel';
+import RemindersPanel from './panels/RemindersPanel';
 import './canvas.css';
 
 const PANEL_META = {
   today: { title: 'Daily planner', sub: 'Your day at a glance — score, priorities, meetings.', comp: TodayPanel },
-  context: { title: 'Context engine', sub: 'What connects to what — meeting prep, follow-ups and related work.', comp: ContextPanel },
   tasks: { title: 'Tasks', sub: 'Everything you committed to, sorted by urgency.', comp: TasksPanel },
   projects: { title: 'Projects', sub: 'Tasks, milestones, meeting notes & documents in one place.', comp: ProjectsPanel },
   notes: { title: 'Notes, ideas & meetings', sub: 'Your second brain — searchable and linked to projects.', comp: NotesPanel },
   drive: { title: 'Drive', sub: 'Private vault — paste screenshots, store files, passwords & links. Local only.', comp: DrivePanel },
-  learning: { title: 'Learning pipeline', sub: 'Nothing counts as learned until it reaches Applied.', comp: LearningPanel },
+  learning: { title: 'Learning pipeline', sub: 'Nothing counts as learned until it reaches Applied. Files, notes and links live on each card.', comp: LearningPanel },
   habits: { title: 'Habit tracker', sub: 'Small daily wins that compound.', comp: HabitsPanel },
   finance: { title: 'Finance', sub: 'Where the money goes, at a glance.', comp: FinancePanel },
   calendar: { title: 'Calendar & timeline', sub: 'Click any date to add a task or event.', comp: CalendarPanel },
-  settings: { title: 'Settings', sub: 'Profile, AI brain, backups.', comp: SettingsPanel },
+  reminders: { title: 'Reminders', sub: 'Nudges at the right time — once or on repeat. Say "remind me…" anywhere in Myth.', comp: RemindersPanel },
+  settings: { title: 'Settings', sub: 'Profile, AI brain, planner brain, backups.', comp: SettingsPanel },
 };
 // wide modules that were modals: on desktop they open in place like the rest
 const WIDE_META = {
   reports: { title: 'Reports & analytics', sub: 'Your month in numbers and a story.', comp: ReportsPanel },
   planner: { title: 'Myth Planner', sub: 'Trips, events, exams, launches — plan it, confirm it, then go live.', comp: PlannerPanel },
-  assistant: { title: 'Myth Assistant', sub: 'Grounded in your live data. Ask anything.', comp: ChatAssistant, flex: true },
+  assistant: { title: 'Myth AI', sub: 'Ask anything, hand me a file, or tell me what to add where.', comp: ChatAssistant, flex: true },
 };
 
 // The two decision cards, stacked beside the hero (below it on phones).
@@ -77,11 +77,37 @@ function CommandRow({ onOpen }) {
   );
 }
 
+// The Planner under the home bar (Planner tab).
+function InlinePlanner({ onClose, onFull }) {
+  return (
+    <section className="inline-planner float-in">
+      <div className="inline-planner-head">
+        <div>
+          <div className="inline-planner-title"><IconCompass size={18} color="#f0a316" /> Myth Planner</div>
+          <div className="inline-planner-sub">Type what you're planning in the bar above — routes, weather, stays, places and several day-by-day plans for trips; dated milestones plus a playbook (training weeks, meal plans, budgets, savings schedules, timetables) for everything else.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          {onFull && <Tooltip label="Open as a full module"><ActionIcon size={34} radius="xl" variant="light" color="gray" onClick={onFull} aria-label="Open full planner"><IconArrowsDiagonal size={16} /></ActionIcon></Tooltip>}
+          <Tooltip label="Back to Myth AI"><ActionIcon size={34} radius="xl" variant="light" color="gray" onClick={onClose} aria-label="Close planner"><IconX size={16} /></ActionIcon></Tooltip>
+        </div>
+      </div>
+      <PlannerPanel embedded />
+    </section>
+  );
+}
+
 export default function Shell() {
   const state = useStore();
   // panel state lives in useUI so widgets, reminders and the Today panel can deep-link
   const panel = useUI((s) => s.panel);
   const setPanel = useUI((s) => s.setPanel);
+  const plannerInline = useUI((s) => s.plannerInline);
+  const showPlannerInline = useUI((s) => s.showPlannerInline);
+  const assistantOpen = useUI((s) => s.assistantOpen);
+  const assistantSeed = useUI((s) => s.assistantSeed);
+  const closeAssistant = useUI((s) => s.closeAssistant);
+  const consumeAssistantSeed = useUI((s) => s.consumeAssistantSeed);
+  const [mode, setMode] = useState('chat'); // the home bar's tabs: chat | planner
   const [inlineChat, setInlineChat] = useState(false);
   const [nowOpen, setNowOpen] = useState(false); // MITH NOW sheet
 
@@ -95,23 +121,14 @@ export default function Shell() {
   }, []);
 
   // system notifications + icon badge: on open, on return to foreground,
-  // and every 5 minutes while the app stays open
+  // and every minute while the app stays open (reminders fire at their minute)
   useEffect(() => {
     const tick = () => runReminderNotifications(useStore.getState());
     tick();
-    const id = setInterval(tick, 5 * 60 * 1000);
+    const id = setInterval(tick, 60 * 1000);
     const onVisible = () => { if (!document.hidden) tick(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
-  }, []);
-
-  // keep the local model loaded so the chat answers instantly instead of cold-starting
-  useEffect(() => {
-    if (!AI_WARMUP) return undefined;
-    const warm = () => keepModelWarm(useStore.getState());
-    warm();
-    const id = setInterval(warm, 4 * 60 * 1000);
-    return () => clearInterval(id);
   }, []);
 
   // Esc closes whatever module is open in place
@@ -120,6 +137,14 @@ export default function Shell() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [panel, setPanel]);
+
+  // the assistant (or a "plan…" action) asked for the planner: switch the bar to Planner mode on the home screen
+  useEffect(() => {
+    if (!plannerInline) return;
+    setMode('planner');
+    setPanel(null);
+    showPlannerInline(false);
+  }, [plannerInline, setPanel, showPlannerInline]);
 
   const spotlightActions = useMemo(() => {
     const acts = [];
@@ -133,14 +158,23 @@ export default function Shell() {
       acts.push({ id: `e${e.id}`, label: e.title, description: `Event · ${dayjs(e.date).format('MMM D')}`, leftSection: <IconCalendarEvent size={16} />, onClick: () => setPanel('calendar') }));
     state.learning.forEach((l) =>
       acts.push({ id: `l${l.id}`, label: l.title, description: 'Learning pipeline', leftSection: <IconNotes size={16} />, onClick: () => setPanel('learning') }));
+    (state.reminders ?? []).filter((r) => !r.done).forEach((r) =>
+      acts.push({ id: `r${r.id}`, label: r.title, description: `Reminder · ${dayjs(r.date).format('MMM D')}${r.time ? ` ${r.time}` : ''}`, leftSection: <IconBellRinging size={16} />, onClick: () => setPanel('reminders') }));
+    (state.plannerSessions ?? []).forEach((p) =>
+      acts.push({ id: `pl${p.id}`, label: p.title || 'Plan', description: `Myth Planner · ${p.mode} · ${p.status}`, leftSection: <IconCompass size={16} />, onClick: () => { useUI.getState().setPlannerFocus(p.id); showPlannerInline(true); } }));
     return acts;
-  }, [state.tasks, state.projects, state.notes, state.events, state.learning, setPanel]);
+  }, [state.tasks, state.projects, state.notes, state.events, state.learning, state.plannerSessions, state.reminders, setPanel, showPlannerInline]);
 
   const desktop = useMediaQuery('(min-width: 1000px)');
   const mobile = useMediaQuery('(max-width: 768px)');
   const meta = PANEL_META[panel];
   const wideMeta = WIDE_META[panel];
   const inPlace = desktop ? (meta ?? wideMeta) : null;
+
+  // phones: the floating assistant is the centre tab's drawer
+  useEffect(() => {
+    if (!desktop && assistantOpen) { setPanel('assistant'); closeAssistant(); }
+  }, [desktop, assistantOpen, setPanel, closeAssistant]);
 
   // phones: full-screen bottom sheets; tablets: right drawers
   const sheetProps = mobile
@@ -154,6 +188,12 @@ export default function Shell() {
         transitionProps: { transition: 'slide-left', duration: 280, timingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' },
       };
 
+  const plannerOnHome = mode === 'planner';
+  // in Planner mode the composer + examples under the bar are the empty state;
+  // the planner card appears once there is a plan to show
+  const plannerFocusId = useUI((s) => s.plannerFocusId);
+  const plannerHasContent = !!plannerFocusId || (state.plannerSessions ?? []).length > 0;
+
   // the home block floats in the middle of the free space (auto margins), and
   // scrolls normally when there is more content than screen
   const home = (
@@ -162,10 +202,11 @@ export default function Shell() {
       <Welcome />
       {/* a device without a sync key yet: paste the passphrase once */}
       <ConnectBanner />
-      <CaptureBar onExpand={() => setPanel('assistant')} onChatOpen={setInlineChat} />
-      {!inlineChat && (
+      <CaptureBar mode={mode} onMode={setMode} onExpand={() => setPanel('assistant')} onChatOpen={setInlineChat} />
+      {plannerOnHome ? (
+        plannerHasContent && <InlinePlanner onClose={() => setMode('chat')} onFull={desktop ? () => setPanel('planner') : null} />
+      ) : !inlineChat && (
         <>
-          <ContextStrip />
           <div className="home-grid">
             <Hero onOpen={setPanel} onNow={() => setNowOpen(true)} mobile={!desktop} />
             <CommandRow onOpen={setPanel} />
@@ -178,7 +219,7 @@ export default function Shell() {
   return (
     <Box className="app-root canvas-page">
       <div className="canvas">
-        {/* the dashboard's own backdrop: a muted, looping video on desktop; a still of the same scene on phones and tablets */}
+        {/* the dashboard's own backdrop: a muted, looping video on desktop; the mobile artwork as a still on phones and tablets */}
         {desktop ? (
           <video
             className="canvas-bg canvas-bg-video"
@@ -188,7 +229,7 @@ export default function Shell() {
         ) : (
           <div
             className="canvas-bg canvas-bg-image"
-            style={{ backgroundImage: `url(${encodeURI(asset('Home page background 1.jpg'))})` }}
+            style={{ backgroundImage: `url(${encodeURI(asset('Mobile app image.jpg'))})` }}
             aria-hidden="true"
           />
         )}
@@ -212,6 +253,9 @@ export default function Shell() {
         )}
       </div>
 
+      {/* the floating Myth AI: reachable from every module on desktop */}
+      {desktop && <AssistantDock />}
+
       {!desktop && <MobileNav onOpen={setPanel} active={panel} />}
 
       {/* phones & tablets: modules as sheets / drawers */}
@@ -229,9 +273,9 @@ export default function Shell() {
             opened={panel === 'assistant'} onClose={() => setPanel(null)} size={mobile ? '100%' : 500} lockScroll={mobile}
             {...sheetProps}
             styles={{ ...sheetProps.styles, body: { height: 'calc(100% - 78px)', display: 'flex', flexDirection: 'column', ...(sheetProps.styles?.body ?? {}) } }}
-            title={<div><Text fw={800} fz={19}>Myth Assistant</Text><Text fz={12.5} c="dimmed" mt={2}>Grounded in your live data. Ask anything.</Text></div>}
+            title={<div><Text fw={800} fz={19}>Myth AI</Text><Text fz={12.5} c="dimmed" mt={2}>Ask anything, hand me a file, or tell me what to add where.</Text></div>}
           >
-            <ChatAssistant />
+            <ChatAssistant initialQuestion={assistantSeed} onConsumedInitial={consumeAssistantSeed} />
           </Drawer>
           {['reports', 'planner'].map((key) => (
             <Modal
@@ -259,7 +303,7 @@ export default function Shell() {
         nothingFound="Nothing found…"
         highlightQuery
         shortcut={['mod + K', '/']}
-        searchProps={{ leftSection: <IconSearch size={18} />, placeholder: 'Search tasks, projects, notes, events…' }}
+        searchProps={{ leftSection: <IconSearch size={18} />, placeholder: 'Search tasks, projects, notes, events, plans…' }}
       />
     </Box>
   );

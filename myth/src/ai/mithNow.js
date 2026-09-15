@@ -14,7 +14,6 @@
 // logic serves the modal, the assistant and node tests.
 import dayjs from 'dayjs';
 import { todayEvents, toMin, fromMin, fmtDuration, DAY_END } from './commandCenter.js';
-import { upcomingMeetingContexts, followUpsNeeded } from './context.js';
 
 export const BUFFER = 3;        // minutes kept free before the next event
 export const QUICK_MAX = 15;    // a quick win takes at most this long
@@ -207,20 +206,6 @@ export function mithNow(state, now = dayjs(), opts = {}) {
   planItems
     .filter((p) => !taskTitles.has(p.text.trim().toLowerCase()))
     .forEach((p) => pool.push({ kind: 'plan', id: p.id, title: p.text, minutes: 10, rank: 60 }));
-
-  let contextWins = [];
-  try {
-    upcomingMeetingContexts(state, 2).slice(0, 3).forEach(({ id, ctx: c }) => {
-      c.unresolvedActions.slice(0, 3).forEach((a) => contextWins.push({
-        kind: 'action', id: `${a.noteId}:${a.idx}`, noteId: a.noteId, idx: a.idx, contextId: id,
-        title: a.text, sub: `open action from "${a.noteTitle}" · needed for ${c.node.label}`, minutes: 10, rank: 90,
-      }));
-    });
-    followUpsNeeded(state, 3).slice(0, 2).forEach(({ id, ctx: c }) => contextWins.push({
-      kind: 'followup', id: `fu:${id}`, contextId: id, title: `Send the follow-up for "${c.node.label}"`, minutes: 5, rank: 85,
-    }));
-  } catch { contextWins = []; }
-  pool.push(...contextWins);
 
   if (now.hour() >= 12) {
     (state.habits ?? []).filter((h) => !h.log?.[key]).forEach((h) =>

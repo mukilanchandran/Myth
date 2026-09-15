@@ -15,8 +15,9 @@
 // functions over a store snapshot — the same code runs in the app, in node
 // tests and in the server-side push digest.
 import dayjs from 'dayjs';
-import { todayEvents, freeWindows, fmtDuration, estimateOf, toMin, fromMin, DAY_START, suggestPlan } from './commandCenter.js';
-import { upcomingMeetingContexts, followUpsNeeded, relDay, tokens, contextFor, createFollowUpTask } from './context.js';
+import { todayEvents, freeWindows, fmtDuration, estimateOf, fromMin, DAY_START, suggestPlan } from './commandCenter.js';
+import { relDay, tokens } from './text.js';
+import { reminderNotifications } from './reminders.js';
 
 export const LEVEL_RANK = { act: 3, plan: 2, fyi: 1 };
 export const DEFAULT_PREFS = { notifyBudget: 4, quietStart: 22, quietEnd: 7 };
@@ -24,7 +25,7 @@ export const DEFAULT_PREFS = { notifyBudget: 4, quietStart: 22, quietEnd: 7 };
 export const DELIVERY_WINDOWS = [8 * 60 + 30, 13 * 60, 18 * 60 + 30];
 const WINDOW_SPAN = 60;
 const MAX_PER_TICK = 2;
-const KIND_ORDER = ['travel', 'overbooked', 'room', 'overdue', 'deadline', 'prep', 'followup', 'bill', 'habit', 'birthday', 'stale', 'plan'];
+const KIND_ORDER = ['reminder', 'travel', 'overbooked', 'room', 'overdue', 'deadline', 'prep', 'followup', 'bill', 'habit', 'birthday', 'stale', 'plan'];
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const keyOf = (d) => d.format('YYYY-MM-DD');
@@ -186,58 +187,7 @@ export function smartNotifications(state, now = dayjs()) {
     });
   });
 
-  // 5. Meeting prep and travel (Context Engine)
-  upcomingMeetingContexts(state, 2).forEach(({ id, ctx }) => {
-    const c = ctx.counts;
-    const isToday = ctx.when.date === today;
-    if (c.openTasks || c.unresolvedActions || c.documents) {
-      const slot = firstFreeSlot(state, now, 30);
-      const whose = isToday ? "today's" : ctx.when.rel === 'Tomorrow' ? "tomorrow's" : `${ctx.when.rel}'s`;
-      out.push({
-        key: `prep:${id}`, fp: `${c.openTasks}/${c.unresolvedActions}/${c.documents}`, kind: 'prep', level: isToday ? 'act' : 'plan', contextId: id,
-        headline: `Prepare for ${whose} ${ctx.node.label}.`,
-        lines: [
-          `${[
-            c.openTasks && plural(c.openTasks, 'open task'),
-            c.unresolvedActions && `${plural(c.unresolvedActions, 'unresolved action item')} from last time`,
-            c.documents && plural(c.documents, 'document'),
-          ].filter(Boolean).join(', ')}.`,
-          slot ? `Free slot to prep${isToday ? '' : ' today'}: ${slot.start}–${slot.end}.` : 'No free slot left today — prep first thing tomorrow.',
-          ctx.travel?.leaveBy ? `Leave by ${ctx.travel.leaveBy}${ctx.travel.location ? ` for ${ctx.travel.location}` : ''}.` : null,
-        ].filter(Boolean),
-        action: { type: 'context', id, label: 'Prepare' },
-      });
-    }
-    if (isToday && ctx.travel?.leaveBy) {
-      const gap = toMin(ctx.travel.leaveBy) - minOf(now);
-      if (gap > 0 && gap <= 120) {
-        out.push({
-          key: `travel:${id}`, fp: ctx.travel.leaveBy, kind: 'travel', level: 'act', contextId: id,
-          headline: `Leave by ${ctx.travel.leaveBy} for ${ctx.node.label}.`,
-          lines: [`~${ctx.travel.minutes} min to ${ctx.travel.location ?? 'the venue'}; it starts at ${ctx.when.time}.`],
-          action: { type: 'context', id, label: 'Open' },
-        });
-      }
-    }
-  });
-
-  // 6. A meeting that still has no follow-up, once it has had a night to settle
-  followUpsNeeded(state, 3).forEach(({ id, ctx }) => {
-    const endedAt = dayjs(`${ctx.when.date} ${ctx.when.time ?? '17:00'}`);
-    if (now.diff(endedAt, 'hour') < 18) return;
-    const openOwn = ctx.ownActions.filter((a) => !a.done).length;
-    out.push({
-      key: `followup:${id}`, fp: String(openOwn), kind: 'followup', level: 'plan', contextId: id,
-      headline: `No follow-up after "${ctx.node.label}" yet.`,
-      lines: [
-        `You met ${relDay(ctx.when.date, now).toLowerCase()}${openOwn ? `; ${plural(openOwn, 'action item')} from it ${openOwn === 1 ? 'is' : 'are'} still open` : ''}.`,
-        'A one-line follow-up keeps the thread alive — Myth can add the task.',
-      ],
-      action: { type: 'followup', id, label: 'Add follow-up task' },
-    });
-  });
-
-  // 7. Bills within two days, with what they cost last time
+  // 5. Bills within two days, with what they cost last time
   (state.events ?? []).filter((e) => e.kind === 'bill').forEach((e) => {
     const diff = yearlyDiff(e, now);
     if (diff < 0 || diff > 2) return;
@@ -321,6 +271,9 @@ export function smartNotifications(state, now = dayjs()) {
     }
   }
 
+  // 12. Reminders — the user asked to be told at this moment (see ai/reminders.js)
+  out.push(...reminderNotifications(state, now));
+
   return out.sort((a, b) => LEVEL_RANK[b.level] - LEVEL_RANK[a.level] || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }
 
@@ -366,28 +319,42 @@ export function inDeliveryWindow(now) {
 // log: [{ key, fp, level, ts }] — what already reached this device.
 export function selectForDelivery(notifs, log = [], now = dayjs(), prefs = DEFAULT_PREFS) {
   const p = prefsOf(prefs);
-  if (inQuietHours(now, p)) return [];
+  const quiet = inQuietHours(now, p);
   const today = keyOf(now);
-  const sentToday = log.filter((l) => keyOf(dayjs(l.ts)) === today).length;
+  // reminders (`exempt`) never count against the daily budget
+  const sentToday = log.filter((l) => keyOf(dayjs(l.ts)) === today && !l.exempt).length;
   const budgetLeft = p.notifyBudget - sentToday;
-  if (budgetLeft <= 0) return [];
-  const lastTs = log.reduce((a, l) => Math.max(a, l.ts), 0);
+  const lastTs = log.filter((l) => !l.exempt).reduce((a, l) => Math.max(a, l.ts), 0);
   const sinceLastMin = lastTs ? (now.valueOf() - lastTs) / 60000 : Infinity;
   const window = inDeliveryWindow(now);
   const picked = [];
-  for (const n of notifs) {
-    if (picked.length >= Math.min(MAX_PER_TICK, budgetLeft)) break;
+  let regular = 0;
+  const saidAlready = (n) => {
     const prev = log.filter((l) => l.key === n.key).sort((a, b) => b.ts - a.ts)[0];
-    if (prev) {
-      const escalated = LEVEL_RANK[n.level] > LEVEL_RANK[prev.level];
-      const changed = prev.fp !== n.fp;
-      const ageH = (now.valueOf() - prev.ts) / 3600000;
-      if (!changed && !escalated) continue; // nothing new to say
-      if (changed && !escalated && ageH < 6) continue; // changed, but it was said recently
+    if (!prev) return false;
+    const escalated = LEVEL_RANK[n.level] > LEVEL_RANK[prev.level];
+    const changed = prev.fp !== n.fp;
+    const ageH = (now.valueOf() - prev.ts) / 3600000;
+    if (!changed && !escalated) return true; // nothing new to say
+    if (changed && !escalated && ageH < 6) return true; // changed, but it was said recently
+    return false;
+  };
+  for (const n of notifs) {
+    if (saidAlready(n)) continue;
+    if (n.exempt) {
+      // a reminder the user set for this moment: outside the windows and the
+      // budget; quiet hours only hold back the heads-up, never the alarm itself
+      if (quiet && n.level !== 'act') continue;
+      if (picked.filter((x) => x.exempt).length >= 3) continue;
+      picked.push(n);
+      continue;
     }
+    if (quiet || budgetLeft <= 0) continue;
+    if (regular >= Math.min(MAX_PER_TICK, budgetLeft)) continue;
     if (n.level === 'fyi' && !window) continue;
     if (n.level === 'plan' && !window && sinceLastMin < 180) continue;
     picked.push(n);
+    regular++;
   }
   return picked;
 }
@@ -416,15 +383,12 @@ export function performAction(action, store, ui) {
     case 'open':
       ui?.setPanel?.(action.panel);
       return null;
-    case 'context':
-      ui?.openContext?.(action.id);
-      return null;
-    case 'followup': {
-      const c = contextFor(s, action.id);
-      if (!c) return null;
-      const due = createFollowUpTask(store, c);
-      return `Follow-up task added — due ${dayjs(due).format('ddd, MMM D')}.`;
-    }
+    case 'reminderDone':
+      s.completeReminder(action.id);
+      return `"${action.title}" done.`;
+    case 'reminderSnooze':
+      s.snoozeReminder(action.id, action.until);
+      return `Snoozed "${action.title}" until ${dayjs(action.until).format('HH:mm')}.`;
     case 'task':
       s.addTask({ title: action.title, due: action.due, priority: 4 });
       return `Added "${action.title}".`;

@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { APP_NAME, asset } from './config/env';
 import * as cloud from './cloud/netlify';
 import { visibleNotifications, selectForDelivery, composeDigest, prefsOf } from './ai/notifications.js';
+import { dailyBrief, briefText } from './ai/dailyBrief.js';
 
 // What the bell shows: everything the engine has a reason for, minus snoozed and dismissed items.
 export function pendingReminders(state, now = dayjs()) {
@@ -141,7 +142,7 @@ export function runReminderNotifications(state) {
   const picked = selectForDelivery(visible, log, now, prefsOf(state.settings));
   picked.forEach((n) => showSystemNotification(n.headline, n.lines.join('\n'), `myth-${n.key}`));
   if (picked.length) {
-    writeDeliveryLog([...log, ...picked.map((n) => ({ key: n.key, fp: n.fp, level: n.level, ts: now.valueOf() }))]);
+    writeDeliveryLog([...log, ...picked.map((n) => ({ key: n.key, fp: n.fp, level: n.level, ts: now.valueOf(), ...(n.exempt ? { exempt: true } : {}) }))]);
   }
   return picked;
 }
@@ -156,6 +157,12 @@ export function runDailyDigest(state) {
   lastDigest = key;
 
   const h = dayjs().hour();
+  // mornings open with the Myth Daily Brief; later in the day the digest is the notifications that matter
+  if (h >= 5 && h < 12) {
+    const brief = dailyBrief(state);
+    notifications.show({ title: `${APP_NAME} Daily Brief`, message: briefText(brief, { schedule: false }).replace(/^.*\n\n/, ''), color: 'forest', autoClose: 12000 });
+    return;
+  }
   const digest = composeDigest(
     visibleNotifications(state).filter((n) => n.level !== 'fyi'),
     h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening',

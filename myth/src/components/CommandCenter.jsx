@@ -6,14 +6,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Box, Group, Text, Stack, Badge, Button, Modal, Progress, SimpleGrid, Checkbox } from '@mantine/core';
 import {
   IconRobotFace, IconCheck, IconPlayerPlay, IconCalendarPlus,
-  IconArrowRight, IconCircleCheck, IconTargetArrow, IconTrash, IconBrain, IconArrowForwardUp,
+  IconArrowRight, IconCircleCheck, IconTargetArrow, IconTrash,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
-import { useUI } from '../store/useUI';
-import { contextFor, createFollowUpTask } from '../ai/context';
 import { commandCenter, fmtDuration } from '../ai/commandCenter';
 import { aiPlanMessage } from '../ai/assistant';
 import { eventIcon } from '../icons';
@@ -196,7 +194,7 @@ export function TodayCard({ items, now, onOpen, i }) {
   const live = items.find((it) => it.status === 'now') ?? items.find((it) => it.status === 'next');
   const desc = items.length
     ? `${items.length} on the clock${live ? ` · ${live.status === 'now' ? 'now' : 'next'}: ${live.title}${live.time ? ` at ${live.time}` : ''}` : ''}.`
-    : 'Nothing on the clock yet. Follow the plan to block focus time, or add an event.';
+    : 'Nothing on the clock yet. Add a meeting or an event and it shows up here.';
 
   return (
     <SoftCard
@@ -209,7 +207,7 @@ export function TodayCard({ items, now, onOpen, i }) {
       )}
     >
       {items.length > 0 && (
-        <Stack gap={0} className="cc-timeline scroll-y" style={{ maxHeight: 160 }}>
+        <Stack gap={0} className="cc-timeline">
           {rows.map((r, idx) => (r.marker ? (
             <Group key={`now-${idx}`} gap={6} wrap="nowrap" className="cc-now">
               <Text fz={10.5} fw={800} w={44} ta="right" c="#0D2D1C" style={{ fontVariantNumeric: 'tabular-nums' }}>{now.format('HH:mm')}</Text>
@@ -343,7 +341,6 @@ function MythCard({ plan, active, onOpen, i }) {
 // ---------- "Handle these" ----------
 export function TriageModal({ opened, onClose, items, onOpen }) {
   const { completeTask, updateTask, toggleHabit, deleteEvent, habits } = useStore();
-  const openContext = useUI((s) => s.openContext);
   const todayKey = dayjs().format('YYYY-MM-DD');
   const tomorrow = dayjs().add(1, 'day').format('YYYY-MM-DD');
   const nextWeek = dayjs().add(7, 'day').format('YYYY-MM-DD');
@@ -404,27 +401,6 @@ export function TriageModal({ opened, onClose, items, onOpen }) {
                 )}
                 {it.ref.type === 'event' && (
                   <Button size="xs" radius="xl" variant="light" color="violet" onClick={() => go(it.ref.source === 'note' ? 'notes' : 'calendar')}>Open</Button>
-                )}
-                {it.ref.type === 'event' && it.eventKind === 'meeting' && (
-                  <Button size="xs" radius="xl" variant="light" color="grape" leftSection={<IconBrain size={13} />}
-                    onClick={() => { onClose(); openContext(`${it.ref.source === 'note' ? 'note' : 'event'}:${it.ref.id}`); }}>
-                    Prep
-                  </Button>
-                )}
-                {it.ref.type === 'context' && (
-                  <>
-                    <Button size="xs" radius="xl" variant="light" color="grape" leftSection={<IconBrain size={13} />} onClick={() => { onClose(); openContext(it.ref.id); }}>
-                      {it.ref.followup ? 'Open meeting' : 'Prepare'}
-                    </Button>
-                    {it.ref.followup && (
-                      <Button size="xs" radius="xl" color="forest" leftSection={<IconArrowForwardUp size={13} />} onClick={() => {
-                        const c = contextFor(useStore.getState(), it.ref.id);
-                        if (c) { createFollowUpTask(useStore, c); notifications.show({ color: 'forest', title: 'Follow-up added', message: `For "${c.node.label}".` }); }
-                      }}>
-                        Add follow-up task
-                      </Button>
-                    )}
-                  </>
                 )}
                 {it.ref.type === 'project' && (
                   <Button size="xs" radius="xl" variant="light" color="orange" onClick={() => go('projects')}>Open project</Button>

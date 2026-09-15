@@ -401,6 +401,7 @@ function search(q) {
     memories: take(col('memories').filter((m) => has(m.text))),
     learning: take(col('learning').filter((l) => has(l.title, l.summary))),
     habits: take(col('habits').filter((h) => has(h.name))),
+    reminders: take(col('reminders').filter((r) => !r.done && has(r.title, r.note))),
     moments: take(col('moments').filter((m) => has(m.title, m.note))),
     routines: take(col('routines').filter((r) => has(r.name, ...(r.steps ?? []).map((st) => st.text)))),
   };

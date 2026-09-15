@@ -1,11 +1,12 @@
 // Myth AI capture engine — turns any free text (typed or spoken) into
 // structured items routed to every feature of the platform: tasks, ideas,
 // notes, meetings, expenses, income, habits, birthdays, events, learning,
-// journal entries, projects and today's-plan items.
+// journal entries, projects, reminders and today's-plan items.
 // Works fully offline; no external calls.
 import * as chrono from 'chrono-node';
 import dayjs from 'dayjs';
-import { contextFor, contextSummary, extractPeople } from './context.js';
+import { extractPeople } from './text.js';
+import { parseReminder, describeWhen, REPEATS } from './reminders.js';
 
 const RX = {
   expense: /(?:spent|paid|bought|purchase[d]?|bill)\s+(?:₹|rs\.?\s*|\$)?\s*(\d[\d,]*(?:\.\d+)?)|(?:₹|rs\.?\s*)\s*(\d[\d,]*(?:\.\d+)?)/i,
@@ -113,6 +114,11 @@ export function parseCapture(raw, projects = []) {
   const baseRaw = { raw, title: cap(rawTitle) };
 
   // --- classification (ordered by specificity) ---
+  // "remind me to …" / "don't forget to …" → a reminder (its own engine reads the repeat and the time)
+  if (RX.reminder.test(raw.trim()) || /^(?:don'?t\s+(?:let me\s+)?forget\s+(?:to\s+)?|reminder[:\-\s])/i.test(raw.trim())) {
+    const r = parseReminder(raw);
+    if (r) return { kind: 'reminder', raw, ...r };
+  }
   const expMatch = text.match(RX.expense);
   const incMatch = text.match(RX.income);
   if (incMatch) {
@@ -147,7 +153,7 @@ export function parseCapture(raw, projects = []) {
   const actionable = (cleanText || text).replace(/^(?:i\s+(?:have|need to|want to|will|am going to)\s+)/i, '');
   const startsWithAction = RX.actionVerb.test(actionable) && !/^(?:meet|call)\s+with\b/i.test(actionable);
   if (RX.meeting.test(text) && !startsWithAction) {
-    // "client meeting tomorrow 10am at Acme office with Ravi" — the place and the people feed the Context Engine
+    // "client meeting tomorrow 10am at Acme office with Ravi" — the place and the people go on the calendar entry
     const src = cleanText || text;
     const locMatch = src.match(/\b(?:at|in|@)\s+([A-Z][\w&'.-]*(?:\s+(?!with\b)[\w&'.-]+){0,4})(?=\s+with\b|\s*$)/);
     const location = locMatch ? locMatch[1].trim() : '';
@@ -156,11 +162,6 @@ export function parseCapture(raw, projects = []) {
     return { kind: 'meeting', ...base, title: mTitle, date: due ?? dayjs().format('YYYY-MM-DD'), time, projectId, location, participants };
   }
   if (RX.event.test(text) && !startsWithAction) return { kind: 'event', ...base, date: due ?? dayjs().format('YYYY-MM-DD'), time };
-  if (RX.reminder.test(raw.trim())) {
-    const t = cap(normalize(cleanText.replace(RX.reminder, '').trim()) || title);
-    return { kind: 'task', ...base, title: t, due, priority, projectId };
-  }
-
   return { kind: 'task', ...base, due, priority, projectId };
 }
 
@@ -179,7 +180,6 @@ function guessCategory(text) {
 }
 
 const isToday = (d) => d && dayjs(d).isSame(dayjs(), 'day');
-const stateOf = (store) => (store.getState ? store.getState() : store);
 
 // Executes a parsed capture against the store. Returns human confirmation text.
 export function executeCapture(parsed, store) {
@@ -201,23 +201,10 @@ export function executeCapture(parsed, store) {
       s.addXp('capture');
       return 'Note saved';
     case 'meeting': {
-      const note = s.addNote({
-        title: parsed.title, type: 'meeting', projectId: parsed.projectId,
-        meeting: { date: parsed.date, time: parsed.time, participants: parsed.participants ?? '', location: parsed.location ?? '', agenda: '', actions: '' },
-      });
-      s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'meeting' });
-      s.addTask({ title: parsed.title, due: parsed.date, priority: 4, projectId: parsed.projectId, tags: ['meeting'] });
-      if (isToday(parsed.date)) s.addPlanItems([parsed.title]);
+      // a meeting is a calendar entry — the place and the people ride along on it
+      s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'meeting', location: parsed.location || null, participants: parsed.participants || null, projectId: parsed.projectId ?? null });
       s.addXp('meeting');
-      // the Context Engine links the new meeting to its project, open tasks, notes, documents and people;
-      // when the project was only implied by the wording, make the link explicit
-      let ctx = contextFor(stateOf(store), `note:${note.id}`);
-      if (ctx?.project && !parsed.projectId) {
-        s.updateNote(note.id, { projectId: ctx.project.id });
-        ctx = contextFor(stateOf(store), `note:${note.id}`);
-      }
-      const linked = ctx ? contextSummary(ctx) : '';
-      return `Meeting on calendar + task list for ${dayjs(parsed.date).format('ddd, MMM D')}${parsed.time ? ` at ${parsed.time}` : ''}${isToday(parsed.date) ? " · on today's plan" : ''}${linked ? ` · ${linked}` : ''}`;
+      return `Meeting on the calendar — ${dayjs(parsed.date).format('ddd, MMM D')}${parsed.time ? ` at ${parsed.time}` : ''}${parsed.location ? ` · ${parsed.location}` : ''}${parsed.participants ? ` · with ${parsed.participants}` : ''}`;
     }
     case 'event':
       s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'event' });
@@ -232,6 +219,9 @@ export function executeCapture(parsed, store) {
     case 'habit':
       s.addHabit({ name: parsed.title });
       return `New habit "${parsed.title}" — tracking starts today`;
+    case 'reminder':
+      s.addReminder({ title: parsed.title, date: parsed.date, time: parsed.time, repeat: parsed.repeat, category: parsed.category, note: '', source: 'capture' });
+      return `Reminder set — ${describeWhen(parsed)}${parsed.repeat !== 'none' ? ` · ${REPEATS[parsed.repeat].toLowerCase()}` : ''}`;
     case 'birthday':
       s.addEvent({ title: parsed.title, date: parsed.date, kind: 'birthday', yearly: true });
       return `Birthday saved for ${dayjs(parsed.date).format('ddd, MMM D')} — I'll remind you every year`;

@@ -1,18 +1,23 @@
 // Myth Assistant — answers questions about your data.
 // 1) A local intelligence layer works fully offline (pattern-matched intents over the dataset).
 // 2) An LLM streams answers grounded in the user's live data. Works with free cloud
-//    providers (Groq, OpenRouter, Gemini — pick one in Settings → AI brain) or a
-//    local Ollama, via any OpenAI-compatible endpoint.
+//    providers (LLM7, Groq, OpenRouter, Gemini — pick one in Settings → AI brain) or
+//    any custom OpenAI-compatible endpoint.
+import * as chrono from 'chrono-node';
 import dayjs from 'dayjs';
 import { monthStats, narrative } from './insights';
-import { parseCapture, executeCapture } from './parser';
-import { upcomingMeetingContexts, followUpsNeeded, briefingText, createFollowUpTask, contextFor, getGraph, tokens } from './context.js';
+import { parseCapture, parseMulti, executeCapture } from './parser';
 import { visibleNotifications } from './notifications.js';
-import { detectAI, pickModel, streamChat, warmUp, OLLAMA_DEFAULT } from './ollama';
+import { reminderRundown, groupReminders, describeWhen, REPEATS } from './reminders';
+import { dailyBrief, briefText, briefForAi } from './dailyBrief';
+import { detectAI, pickModel, streamChat, DEFAULT_ENDPOINT } from './llm';
 import { providerFor, PROVIDERS } from './providers';
 import { commandCenter, fmtDuration } from './commandCenter';
 import { mithNow, nowText, nowBrief } from './mithNow';
 import { detectProjectIntent, describePlan, normalizeAiPlan, TEMPLATES } from './projectPlanner';
+import { actionCatalogue, parseActions, visibleText, runActions, localActionIntent } from './actions';
+import { useUI } from '../store/useUI';
+import { putBlob, getBlob } from '../store/fileStore';
 import { APP_NAME } from '../config/env';
 
 function fmtTask(t) {
@@ -21,7 +26,27 @@ function fmtTask(t) {
 
 const LEARNING_STAGES = ['want to learn', 'learning', 'applied', 'taught/shared'];
 
-// Today's-plan items (the pills under the capture bar).
+// Clear question phrasing — never a capture, always an answer.
+const QUESTION = /^(what|how|which|when|who|why|where|can|could|should|would|is|are|am|do|does|did|tell|explain|show|hi|hey|hello|thanks|thank)\b|^(?:prep(?:are)?\s+me|brief\s+me|get\s+me\s+ready)\b|\?$/i;
+
+// Captures the parser is sure about ("spent 250 on lunch", "habit: read", "idea: …",
+// "meeting with Ravi tomorrow 10am"). A plain sentence that would only become a
+// task is left to the model, which may decide it is a question, an action or chat.
+const SURE_KINDS = new Set(['expense', 'income', 'habit', 'idea', 'note', 'journal', 'birthday', 'meeting', 'event', 'reminder', 'learning', 'plan', 'project']);
+function sureCaptures(text, state) {
+  if (QUESTION.test(text)) return null;
+  const items = parseMulti(text, state.projects);
+  return items.length && items.every((i) => SURE_KINDS.has(i.kind)) ? items : null;
+}
+// Offline: anything that is not a question is filed through the capture engine.
+function offlineCaptures(text, state) {
+  if (QUESTION.test(text)) return null;
+  const items = parseMulti(text, state.projects);
+  return items.length ? items : null;
+}
+const fileAll = (items, store) => items.map((i) => `✅ ${executeCapture(i, store)}`).join('\n');
+
+// Today's-plan items (the pills in the Myth AI box).
 function todayPlanItems(state) {
   return state.plans?.[dayjs().format('YYYY-MM-DD')] ?? [];
 }
@@ -47,6 +72,16 @@ export function localAnswer(q, state) {
   const text = q.toLowerCase();
   const tasks = state.tasks;
   const open = tasks.filter((t) => t.status !== 'done');
+
+  // "brief me" / "daily brief" / "how does my day look" — the Myth Daily Brief, as text
+  if (/\b(?:daily|morning|day'?s?)\s+brief\b|\bbrief\s+me\b|\bmy\s+brief\b|how (?:does|is) (?:my|the) day (?:look|going)|what(?:'s| is) (?:my|the) day like|summar(?:y|ise|ize) (?:of )?(?:my|the) day/.test(text)) {
+    return briefText(dailyBrief(state));
+  }
+
+  // "what are my reminders" / "any reminders today?" / "show reminders"
+  if (/\bremind(?:er|ers)?\b/.test(text) && /\b(?:what|which|any|list|show|my|today|tomorrow|upcoming|overdue|do i have|pending)\b/.test(text) && !/^(?:please\s+)?remind me\b/.test(text)) {
+    return reminderRundown(state);
+  }
 
   // "what did I work on <day>" / "what did I do"
   const dayMatch = text.match(/what (?:did|have) i (?:work(?:ed)? on|do(?:ne)?)\s*(.*)/);
@@ -106,33 +141,24 @@ export function localAnswer(q, state) {
       .join('\n\n');
   }
 
-  // Context Engine — "prepare me for tomorrow's meeting", "what do I need for the client meeting", "context for <project>"
-  if (/(?:\b(?:prep(?:are)?|preparation|brief(?:ing)?|get (?:me )?ready|what do i need)\b.*\b(?:meeting|call|client|tomorrow|today|next|review|demo)\b)|\bmeeting (?:prep|context|brief)|\bcontext (?:for|of|on)\b|^(?:prep|brief me|briefing)$/.test(text)) {
-    const ups = upcomingMeetingContexts(state, 14);
-    const tomorrowKey = dayjs().add(1, 'day').format('YYYY-MM-DD');
-    const todayKey = dayjs().format('YYYY-MM-DD');
-    const tail = '\n\nOpen the Context engine (brain icon in the dock) to tick action items, block travel or create a prep note.';
-    if (/tomorrow/.test(text)) { const pick = ups.find((u) => u.ctx.when.date === tomorrowKey); if (pick) return briefingText(pick.ctx) + tail; }
-    else if (/today/.test(text)) { const pick = ups.find((u) => u.ctx.when.date === todayKey); if (pick) return briefingText(pick.ctx) + tail; }
-    else {
-      // a named project, person or note beats guessing a meeting
-      const named = [...getGraph(state).nodes.values()]
-        .filter((n) => n.type !== 'task' && n.label.length >= 4 && text.includes(n.label.toLowerCase()))
-        .sort((a, b) => b.label.length - a.label.length)[0];
-      if (named) return briefingText(contextFor(state, named.id)) + tail;
-      const pick = ups.find((u) => tokens(u.ctx.node.label).some((t) => text.includes(t))) ?? ups[0];
-      if (pick) return briefingText(pick.ctx) + tail;
-    }
-    const fu = followUpsNeeded(state, 5)[0];
-    if (fu) return `${briefingText(fu.ctx)}\n\nSay "add follow-up task" and I'll create it.`;
-    return 'Nothing coming up to prepare for, Boss. Capture one like "client meeting tomorrow 10am" and I\'ll link it to its project, tasks, notes and documents.';
+  // "prepare me for tomorrow's meeting" / "what meetings do I have this week" — straight from the calendar
+  if (/(?:\b(?:prep(?:are)?|preparation|brief(?:ing)?|get (?:me )?ready|what do i need)\b.*\b(?:meeting|call|client|tomorrow|today|next|review|demo)\b)|\bmeeting (?:prep|brief)|^(?:prep|brief me|briefing)$|\bmeetings?\b.*\b(?:today|tomorrow|this week|coming|upcoming)\b/.test(text)) {
+    const scope = /tomorrow/.test(text) ? 'tomorrow' : /today/.test(text) ? 'today' : 'week';
+    const target = scope === 'tomorrow' ? dayjs().add(1, 'day') : dayjs();
+    const meetings = upcomingEvents(state, scope === 'week' ? 7 : 1)
+      .filter((e) => e.kind === 'meeting' && (scope === 'week' || e.next.isSame(target, 'day')));
+    if (!meetings.length) return `No meetings ${scope === 'week' ? 'in the next week' : scope}, Boss. Capture one like "client meeting tomorrow 10am" and it goes straight on the calendar.`;
+    return [
+      `Meetings ${scope === 'week' ? 'this week' : scope}:`,
+      ...meetings.map((e) => `• ${e.next.format('ddd, MMM D')}${e.time ? ` ${e.time}` : ''} — ${e.title}${e.location ? ` · ${e.location}` : ''}${e.participants ? ` · with ${e.participants}` : ''}`),
+    ].join('\n');
   }
 
-  // "what's on today's plan" / "my plan" / "plan progress" — the pill strip under the capture bar
+  // "what's on today's plan" / "my plan" / "plan progress" — the pill strip in the Myth AI box
   if (/(?:today'?s?|my|the)\s+plan|plan\s+(?:for\s+)?today|what(?:'s| is)\s+(?:on\s+)?(?:my\s+)?plan|plan\s+(?:progress|status|left|remaining)/.test(text)
       && !/plan (?:my )?(?:day|week|tomorrow)/.test(text)) {
     const items = todayPlanItems(state);
-    if (!items.length) return `No plan set for today yet, Boss. Tell me "plan: <something>" or tap "Set today's plan" under the capture bar.`;
+    if (!items.length) return `No plan set for today yet, Boss. Tell me "plan: <something>" or tap "Set today's plan" in the Myth AI box.`;
     const done = items.filter((i) => i.done);
     const pending = items.filter((i) => !i.done);
     return [
@@ -245,7 +271,7 @@ export function localAnswer(q, state) {
 
   if (/idea/.test(text)) {
     const ideas = state.notes.filter((n) => n.type === 'idea').slice(0, 8);
-    if (!ideas.length) return 'Your idea vault is empty. Type "idea: ..." in the capture bar to start filling it.';
+    if (!ideas.length) return 'Your idea vault is empty. Tell me "idea: ..." to start filling it.';
     return ['Recent ideas:', ...ideas.map((n) => `• ${n.title}`)].join('\n');
   }
 
@@ -262,6 +288,18 @@ export function localAnswer(q, state) {
   }
 
   return null; // not understood locally
+}
+
+// Files attached to messages in the current conversation, newest first.
+export function chatFiles(state, extra = []) {
+  const seen = new Set();
+  const out = [];
+  for (const f of [...extra, ...[...(state.chat ?? [])].reverse().flatMap((m) => m.files ?? [])]) {
+    if (!f?.id || seen.has(f.id)) continue;
+    seen.add(f.id);
+    out.push(f);
+  }
+  return out;
 }
 
 // Build a compact but rich snapshot of the user's data for the model.
@@ -294,6 +332,8 @@ function buildContext(state) {
       done: plan.filter((i) => i.done).length,
       total: plan.length,
     },
+    // Myth Daily Brief — the status card on the home screen (ai/dailyBrief.js)
+    dailyBrief: briefForAi(dailyBrief(state)),
     commandCenter: {
       dayProgress: cc.progress,
       needsAttention: cc.attention.slice(0, 8).map((a) => ({ what: a.title, why: a.sub, kind: a.kind })),
@@ -321,21 +361,19 @@ function buildContext(state) {
     projects: state.projects.map((p) => ({ name: p.name, status: p.status, deadline: p.deadline })),
     recentNotes: recentNotes.map((n) => ({ type: n.type, title: n.title })),
     habitsToday: state.habits.map((h) => ({ name: h.name, done: !!h.log[today] })),
-    upcomingEvents: upcomingEvents(state, 30).slice(0, 12).map((e) => ({ title: e.title, date: e.next.format('YYYY-MM-DD'), time: e.time, kind: e.kind })),
-    learningPipeline: (state.learning ?? []).map((l) => ({ title: l.title, stage: LEARNING_STAGES[l.stage] ?? 'want to learn' })),
+    // Reminders — nudges at a time, once or on repeat (ai/reminders.js)
+    reminders: (() => {
+      const g = groupReminders(state.reminders ?? []);
+      const pack = (r) => ({ title: r.title, when: describeWhen(r), repeat: r.repeat && r.repeat !== 'none' ? REPEATS[r.repeat] : undefined, note: r.note || undefined });
+      return { overdue: g.overdue.slice(0, 6).map(pack), today: g.today.slice(0, 8).map(pack), tomorrow: g.tomorrow.slice(0, 5).map(pack), thisWeek: g.week.slice(0, 6).map(pack), laterCount: g.later.length };
+    })(),
+    upcomingEvents: upcomingEvents(state, 30).slice(0, 12).map((e) => ({ title: e.title, date: e.next.format('YYYY-MM-DD'), time: e.time, kind: e.kind, location: e.location ?? undefined, participants: e.participants ?? undefined })),
+    learningPipeline: (state.learning ?? []).map((l) => ({ title: l.title, stage: LEARNING_STAGES[l.stage] ?? 'want to learn', files: (l.fileIds ?? []).length, links: (l.links ?? []).length, notes: l.notes ? l.notes.slice(0, 80) : undefined })),
+    // files handed to the assistant in this conversation (newest first) — the id is what actions refer to
+    chatFiles: chatFiles(state).slice(0, 6).map((f) => ({ id: f.id, name: f.name, type: f.type, sizeKb: Math.round((f.size ?? 0) / 1024), excerpt: f.text ? f.text.slice(0, 1800) : undefined })),
+    plannerSessions: (state.plannerSessions ?? []).slice(0, 6).map((p) => ({ title: p.title, mode: p.mode, status: p.status })),
     recentTransactions: (state.transactions ?? []).slice(0, 12).map((t) => ({ type: t.type, amount: t.amount, category: t.category, note: t.note, date: t.date })),
     recentJournal: state.journal.slice(0, 5).map((j) => ({ date: j.date, mood: j.mood, energy: j.energy, text: (j.text || j.reflection || '').slice(0, 100) })),
-    // Context Engine — each upcoming meeting explained through everything linked to it
-    contextEngine: {
-      upcomingMeetings: upcomingMeetingContexts(state, 7).slice(0, 4).map(({ ctx }) => ({
-        title: ctx.node.label, when: `${ctx.when.date}${ctx.when.time ? ` ${ctx.when.time}` : ''}`, project: ctx.project?.name ?? null,
-        people: ctx.people.map((p) => p.label), openTasks: ctx.openTasks.slice(0, 6).map((r) => r.node.label),
-        documents: ctx.documents.slice(0, 5).map((r) => r.node.label), unresolvedActions: ctx.unresolvedActions.slice(0, 6).map((a) => a.text),
-        previousMeetings: ctx.previousMeetings.slice(0, 3).map((r) => `${r.node.label} (${r.node.date})`),
-        leaveBy: ctx.travel?.leaveBy ?? null, followUpExists: !!ctx.followUpTask,
-      })),
-      followUpsNeeded: followUpsNeeded(state, 5).map(({ ctx }) => ({ title: ctx.node.label, date: ctx.when.date, unresolvedActions: ctx.unresolvedActions.length })),
-    },
     // Notification intelligence — what Myth would interrupt for right now, with the reasoning
     notifications: visibleNotifications(state).slice(0, 5).map((n) => ({ level: n.level, headline: n.headline, why: n.lines })),
     gamification: { xpPoints: points, level: Math.floor(Math.sqrt(points / 40)) + 1, streakDays: streakCount },
@@ -357,21 +395,31 @@ function systemPrompt(state) {
     `You can answer ANY question, on two levels:`,
     `1) Questions about the user's life (tasks, money, habits, projects, schedule) — answer concretely from the live DATA snapshot below. Never invent numbers about their data; if something isn't in DATA, say so.`,
     `2) Everything else — general knowledge, geography, science, history, math, advice, writing, ideas — answer fully and confidently from your own knowledge, like any capable AI assistant. The DATA snapshot is context about the user, NOT a limit on what you know. Never refuse a general question by saying "my data doesn't have that".`,
-    `You know the Myth app inside-out. Its features (all reflected in DATA): Today's plan (todayPlan — the morning "what I'll do today" pills under the capture bar; each item can be ticked done; user can add via "plan: ..." or the Set today's plan button), the capture bar (free text/voice → auto-routed to tasks, ideas, notes, meetings, expenses, income, habits, birthdays, events, learning, journal, plan items), Tasks (priorities 1-5, due dates, statuses), Projects (tasks link to them), Notes/Ideas/Meetings vault, Habits with streaks, Finance (₹ expenses/income by category), Journal (mood & energy 1-5), Learning pipeline (want-to-learn → learning → applied → taught), Calendar events & yearly birthdays, Drive (private file/password vault — you see counts only, contents stay private), Reports (monthly reviews), XP/levels/streak gamification. Work and personal live in one combined flow.`,
-    `Context Engine (DATA.contextEngine): every meeting is linked to its project, open tasks, notes, documents, people and previous meetings with unresolved action items. Use it proactively — when a meeting is near, summarise what is open (e.g. "Tomorrow's client meeting: 4 open tasks, 2 documents, 3 unresolved action items") and suggest preparing; the user can open the Context engine panel to act on it.`,
+    `You know the Myth app inside-out. Its features (all reflected in DATA): Today's plan (todayPlan — the morning "what I'll do today" pills in the Myth AI box; each item can be ticked done; user can add via "plan: ..." or the Set today's plan button), the Myth AI bar (free text/voice → auto-routed to tasks, ideas, notes, meetings, expenses, income, habits, birthdays, events, learning, journal, plan items), Tasks (priorities 1-5, due dates, statuses), Projects (tasks link to them), Notes/Ideas/Meetings vault, Habits with streaks, Finance (₹ expenses/income by category), Journal (mood & energy 1-5), Learning pipeline (want-to-learn → learning → applied → taught), Calendar events & yearly birthdays, Drive (private file/password vault — you see counts only, contents stay private), Reports (monthly reviews), XP/levels/streak gamification. Work and personal live in one combined flow.`,
+    `Meetings are plain calendar entries (DATA.upcomingEvents with kind "meeting", carrying time, location and participants when known). When asked about meetings, answer from the calendar — there is no separate meeting-prep feature.`,
     `Notification intelligence (DATA.notifications): the things worth interrupting the user for right now, each with its reasoning — what, by when, how long it needs, whether the day has room. When asked what to handle first or why something was flagged, answer from it; never invent urgency that isn't there.`,
+    `Reminders (DATA.reminders): nudges that fire as notifications at their time, once or on repeat (daily, weekdays, weekly, monthly, yearly), with snooze. A reminder is a nudge, a task is work — "remind me to call Ravi at 5" is a reminder (add_reminder), "call Ravi" alone is a task. Questions like "what are my reminders", "anything overdue", "what's on for tomorrow" are answered from DATA.reminders. complete_reminder, snooze_reminder and delete_reminder act on them by title; list_reminders reads them back.`,
     `When asked about today's plan, answer from DATA.todayPlan (items with done flags). Questions about ANY feature above — how it works, what's in it, progress — answer them; never claim you lack access to a Myth feature.`,
     `The home screen is the Life Command Center: DATA.commandCenter holds the day progress, what needs attention, today's timeline and the plan you suggest (focus blocks that fit between events). When asked what matters now, what to do next or what the plan is, answer from it, and mention they can say "follow the plan" to put the focus blocks on today's calendar.`,
+    `Myth Daily Brief (DATA.dailyBrief): the status card at the top of the home screen — today's numbers (tasks · meetings · deadlines), the one thing to finish (focus), what is slipping (potentialProblem: a project behind schedule, overdue work, a missed reminder), the personal line (bills, birthdays, personal reminders, habits), the learning slot and a suggested schedule for the day. "Brief me", "morning brief", "how does my day look" → answer from it in the same order. It is rebuilt from live data all day, so it is always current.`,
     `MITH NOW (DATA.mithNow): the big "What should I do now?" button. It measures the minutes until the next meeting/event, picks the one task that best fits that window (bestUse) and fills the rest with quick wins (then). When asked what to do now / right now, answer from DATA.mithNow exactly — the same task, minutes and quick wins — and mention they can press the button to start a timed sprint. Mith learns from what they start, skip and finish.`,
     `Automatic project creation: when the user describes an undertaking ("I need to launch my portfolio website next month") Myth drafts a project proposal — milestones and dated tasks — and asks before creating anything. DATA.proposal holds the pending one, if any; it becomes a real project only when they press Create project or say "create project".`,
+    `YOU CAN ACT, not only answer. Every feature of Myth is an action you may run. When the user asks you to add, create, save, file, attach, generate, move, complete, open or plan something, answer in one or two short lines and then append ONE fenced block with the actions, exactly like:`,
+    '```myth',
+    '[{"action":"add_learning","title":"React hooks","file":"last"}]',
+    '```',
+    `Available actions (JSON objects with "action" plus these fields):\n${actionCatalogue()}`,
+    `Rules for actions: only when the user clearly wants something done (a question gets no block). Dates may be natural ("tomorrow", "next friday") or YYYY-MM-DD. "file":"last" means the newest file in DATA.chatFiles; the user's "this file"/"the pdf"/"it" means that file. To create a document (PDF, Markdown, text, CSV, HTML, JSON) write the full content yourself in "content" (Markdown headings and bullets are fine, 200-800 words) and use create_file with "to" = where it belongs — learning, project, drive. Anything the user wants to learn from goes to learning; documents for a project go to that project; everything else to drive. Never claim something was added unless you emitted the action. Never put the block inside prose or before the text.`,
+    `Myth Planner (DATA.plannerSessions): trips, events, exams, fitness goals, meal plans / diets, money goals, businesses, websites, writing, home projects, career moves, routines. A sentence like "trip from Chennai to Goa 20-24 Dec for 2" or "vegetarian meal plan to lose weight" → use the plan action; the planner then builds the schedule plus a playbook (routes, stays and itineraries for trips; training weeks, meal plans, budget splits, savings schedules for the rest). Plans can go live for day-by-day guidance.`,
     `Be brief and warm; use short lines and the occasional emoji, matching a productivity app. Amounts are in Indian rupees (₹).`,
     `DATA: ${JSON.stringify(buildContext(state))}`,
   ].join('\n');
 }
 
 // Resolve which endpoint/model to use.
-// Configured provider first; with nothing configured the fallback chain is
-// local Ollama (private) → LLM7 free keyless cloud, so chat works out of the box.
+// Configured provider first; with nothing configured, the build-time default
+// endpoint (the free keyless LLM7 cloud unless VITE_AI_ENDPOINT says otherwise),
+// so chat works out of the box.
 export async function resolveAI(state) {
   const { aiEndpoint, aiModel, aiKey } = state.settings;
 
@@ -390,43 +438,34 @@ export async function resolveAI(state) {
     return { ok: true, endpoint: aiEndpoint, apiKey: aiKey, model: pickModel(aiModel || provider?.defaultModel, usable) };
   }
 
-  // Auto mode 1: local Ollama when it's running (fully private).
-  const local = await detectAI(OLLAMA_DEFAULT);
-  if (local.ok) return { ok: true, endpoint: OLLAMA_DEFAULT, apiKey: '', model: pickModel(aiModel, local.models) };
-
-  // Auto mode 2: LLM7 — free cloud, no key needed.
+  // Auto mode: the build-time default endpoint, then LLM7 (free cloud, no key needed).
   const llm7 = PROVIDERS.find((p) => p.id === 'llm7');
-  const cloud = await detectAI(llm7.endpoint);
-  if (cloud.ok) {
-    const models = llm7.mapModels(cloud.models);
+  for (const endpoint of new Set([DEFAULT_ENDPOINT, llm7.endpoint])) {
+    const probe = await detectAI(endpoint);
+    if (!probe.ok) continue;
+    const provider = providerFor(endpoint);
+    const models = provider?.mapModels ? provider.mapModels(probe.models) : probe.models;
     return {
-      ok: true, endpoint: llm7.endpoint, apiKey: '',
-      model: pickModel(aiModel || llm7.defaultModel, models.length ? models : llm7.fallbackModels),
+      ok: true, endpoint, apiKey: '',
+      model: pickModel(aiModel || provider?.defaultModel, models.length ? models : (provider?.fallbackModels ?? probe.models)),
     };
   }
   return { ok: false, configured: false };
 }
 
-// Keep the local model resident so questions answer in ~1s instead of ~30s.
-// Call on app start and every few minutes while the app is open.
-export async function keepModelWarm(state) {
-  const ai = await resolveAI(state);
-  if (!ai.ok) return false;
-  await warmUp(ai.endpoint, ai.model);
-  return true;
-}
-
 // Open-source LLM bridge (OpenAI-compatible). Streams tokens through onToken.
-export async function llmAnswer(q, state, onToken, history = []) {
+export async function llmAnswer(q, state, onToken, history = [], files = []) {
   const ai = await resolveAI(state);
   if (!ai.ok) return null;
-  const recent = history.slice(-8).map((m) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }));
+  const withFiles = (m) => (m.files?.length ? `${m.text}\n[attached: ${m.files.map((f) => `${f.name} (id ${f.id})`).join(', ')}]` : m.text);
+  const recent = history.slice(-8).map((m) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: withFiles(m) }));
+  const fresh = files.filter((f) => !history.some((m) => (m.files ?? []).some((x) => x.id === f.id)));
   const text = await streamChat({
     endpoint: ai.endpoint, model: ai.model, apiKey: ai.apiKey, onToken,
     messages: [
       { role: 'system', content: systemPrompt(state) },
       ...recent,
-      { role: 'user', content: q },
+      { role: 'user', content: fresh.length ? `${q}\n[attached now: ${fresh.map((f) => `${f.name} (id ${f.id})`).join(', ')}]` : q },
     ],
   });
   return text || null;
@@ -564,9 +603,37 @@ export async function aiProjectPlan(intent, state) {
   }
 }
 
-export async function askAssistant(q, store, onToken) {
+// Everything an action may need: the store, the files in this chat, blob
+// storage, navigation, and a way to have the model write a document.
+function actionContext(store, files) {
+  const ui = useUI.getState();
+  return {
+    store, files, putBlob, getBlob,
+    ui: { setPanel: ui.setPanel, setPlannerFocus: ui.setPlannerFocus, showPlannerInline: ui.showPlannerInline },
+    write: async (prompt) => {
+      const ai = await resolveAI(store.getState());
+      if (!ai.ok) return null;
+      return streamChat({
+        endpoint: ai.endpoint, model: ai.model, apiKey: ai.apiKey, temperature: 0.5,
+        messages: [
+          { role: 'system', content: 'You write clear, well-structured documents for a personal knowledge base. Output ONLY the document body in Markdown — no preamble, no closing line.' },
+          { role: 'user', content: prompt },
+        ],
+      });
+    },
+  };
+}
+
+// opts.files: files attached to this message — [{ id, name, type, size, text? }], already stored.
+export async function askAssistant(q, store, onToken, opts = {}) {
   const state = store.getState();
   const trimmed = q.trim();
+  const files = chatFiles(state, opts.files ?? []);
+  const ctx = actionContext(store, files);
+
+  // "add this pdf to learning", "create a study sheet on X and save it to learning" — routed without a model
+  const acted = await localActionIntent(trimmed, ctx);
+  if (acted) return acted;
 
   // ---- automatic project creation ----
   // "create project" / "yes" confirms the pending proposal; "discard the proposal" drops it;
@@ -581,6 +648,24 @@ export async function askAssistant(q, store, onToken) {
       return 'Proposal discarded — nothing was created, Boss.';
     }
   }
+  // "remind me to …" / "don't forget to …" — a reminder, without a model
+  if (/^(?:please\s+)?(?:remind\s+me\b|don'?t\s+(?:let me\s+)?forget\b|reminder[:\-\s])/i.test(trimmed)) {
+    const parsed = parseCapture(trimmed, state.projects);
+    if (parsed?.kind === 'reminder') return `${executeCapture(parsed, store)} ✅`;
+  }
+  // "snooze <reminder> [for 1 hour / until tomorrow 9am]"
+  const snooze = trimmed.match(/^snooze\s+(?:the\s+)?(?:reminder\s+)?(.+?)(?:\s+(?:for|until|till|to)\s+(.+))?\s*$/i);
+  if (snooze) {
+    const phrase = snooze[1].trim().toLowerCase();
+    const r = (state.reminders ?? []).find((x) => !x.done && x.title.toLowerCase().includes(phrase));
+    if (r) {
+      const when = snooze[2] ? chrono.parseDate(snooze[2], new Date(), { forwardDate: true }) : null;
+      const until = dayjs(when ?? dayjs().add(1, 'hour').toDate());
+      state.snoozeReminder(r.id, until.toISOString());
+      return `"${r.title}" snoozed until ${until.isSame(dayjs(), 'day') ? until.format('HH:mm') : until.format('ddd, MMM D HH:mm')} ⏰`;
+    }
+  }
+
   const projectIntent = detectProjectIntent(q);
   if (projectIntent) {
     const plan = state.proposeProject(q, projectIntent);
@@ -592,14 +677,6 @@ export async function askAssistant(q, store, onToken) {
   if (planAdd) {
     state.addPlanItems([planAdd[1].trim()]);
     return `Added to today's plan, Boss ✅ — "${planAdd[1].trim()}"`;
-  }
-
-  // "add follow-up task" — the Context Engine picks the meeting that still needs one
-  if (/^(?:add|create|make)\s+(?:a\s+)?follow[- ]?up/i.test(q.trim())) {
-    const target = followUpsNeeded(state, 7)[0] ?? upcomingMeetingContexts(state, 7).find((u) => !u.ctx.followUpTask);
-    if (!target) return 'Every recent meeting already has a follow-up, Boss.';
-    const due = createFollowUpTask(store, target.ctx);
-    return `Follow-up task added for "${target.ctx.node.label}" — due ${dayjs(due).format('ddd, MMM D')} ✅`;
   }
 
   // "plan: review designs" — direct plan capture
@@ -622,6 +699,12 @@ export async function askAssistant(q, store, onToken) {
     if (task) {
       state.completeTask(task.id);
       return `Task "${task.title}" marked done ✅`;
+    }
+    const reminder = (state.reminders ?? []).find((r) => !r.done && r.title.toLowerCase().includes(phrase.replace(/^(?:the\s+)?reminder\s+/, '')));
+    if (reminder) {
+      state.completeReminder(reminder.id);
+      const repeating = reminder.repeat && reminder.repeat !== 'none';
+      return `Reminder "${reminder.title}" done ✅${repeating ? ` — next one ${describeWhen(store.getState().reminders.find((r) => r.id === reminder.id)).toLowerCase()}.` : ''}`;
     }
   }
 
@@ -650,15 +733,29 @@ export async function askAssistant(q, store, onToken) {
     if (parsed) return executeCapture(parsed, store);
   }
 
+  // clearly-marked captures are filed at once — no model, no waiting
+  const sure = sureCaptures(trimmed, state);
+  if (sure) return fileAll(sure, store);
+
   const local = localAnswer(q, state);
-  // Prefer the LLM (configured endpoint, or auto-detected local Ollama); fall back to the local brain.
+  // Prefer the LLM (configured endpoint, or the free default); fall back to the local brain.
+  // The model's action block is hidden while streaming and executed once the answer is complete.
   try {
-    const llm = await llmAnswer(q, state, onToken, state.chat);
-    if (llm) return llm;
+    const raw = await llmAnswer(q, state, onToken ? (t) => onToken(visibleText(t)) : null, state.chat, files);
+    if (raw) {
+      const { text, actions } = parseActions(raw);
+      if (!actions.length) return text || raw;
+      const lines = await runActions(actions, ctx);
+      return [text, ...lines].filter(Boolean).join('\n');
+    }
   } catch {
     if (local) return local + '\n\n(⚠ AI model unreachable — answered locally)';
+    const captured = offlineCaptures(trimmed, state);
+    if (captured) return `${fileAll(captured, store)}\n\n(⚠ AI model unreachable — filed by the capture engine)`;
     return '⚠ Boss, my AI model is unreachable. Check Settings → AI brain (endpoint, model and API key), or ask me about tasks, priorities, reports, habits, or expenses — I can answer those offline.';
   }
   if (local) return local;
+  const captured = offlineCaptures(trimmed, state);
+  if (captured) return `${fileAll(captured, store)}\n\n(⚠ AI model offline — filed by the capture engine)`;
   return `Boss, I can answer things like:\n• "What are my priorities today?"\n• "Generate my monthly report"\n• "What's overdue?"\n• "How much did I spend this month?"\n\nMy AI brain seems offline right now (I normally connect to a free AI automatically). Check your internet, or pick a provider in Settings → AI brain. ✨`;
 }

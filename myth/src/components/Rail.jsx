@@ -3,8 +3,8 @@
 // with the canvas edge. Talking to Myth happens in the capture bar.
 import { Tooltip, Popover, SimpleGrid, Text, ThemeIcon } from '@mantine/core';
 import {
-  IconHome, IconChecklist, IconFolders, IconNotes, IconCalendarMonth, IconCompass, IconRepeat, IconWallet,
-  IconChartAreaLine, IconGridDots, IconSchool, IconCloudLock, IconBrain, IconSettings, IconLogout, IconLayoutDashboard,
+  IconHome, IconChecklist, IconFolders, IconNotes, IconCalendarMonth, IconRepeat, IconWallet,
+  IconChartAreaLine, IconGridDots, IconSchool, IconCloudLock, IconSettings, IconLogout, IconLayoutDashboard, IconBellRinging,
 } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
@@ -14,15 +14,15 @@ const MAIN = [
   { key: 'projects', label: 'Projects', icon: IconFolders },
   { key: 'calendar', label: 'Calendar', icon: IconCalendarMonth },
 ];
-// everything else lives behind the grid-dots button
+// everything else lives behind the grid-dots button (the Planner moved into
+// the capture bar's mode dial — it is a way of typing, not a place)
 const MORE = [
+  { key: 'reminders', label: 'Reminders', icon: IconBellRinging, color: '#e03131' },
   { key: 'notes', label: 'Notes & ideas', icon: IconNotes, color: '#1b5a38' },
-  { key: 'planner', label: 'Myth Planner', icon: IconCompass, color: '#1971c2' },
   { key: 'habits', label: 'Habits', icon: IconRepeat, color: '#0D2D1C' },
   { key: 'finance', label: 'Finance', icon: IconWallet, color: '#e8590c' },
   { key: 'reports', label: 'Monthly report', icon: IconChartAreaLine, color: '#5f3dc4' },
   { key: 'today', label: 'Daily planner', icon: IconLayoutDashboard, color: '#0D2D1C' },
-  { key: 'context', label: 'Context engine', icon: IconBrain, color: '#7048e8' },
   { key: 'learning', label: 'Learning', icon: IconSchool, color: '#e8590c' },
   { key: 'drive', label: 'Drive', icon: IconCloudLock, color: '#1971c2' },
 ];

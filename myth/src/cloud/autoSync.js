@@ -14,15 +14,15 @@
 import * as netlifyCloud from './netlify.js';
 
 const META_KEY = 'myth-sync-meta'; // { cloudUpdatedAt } — what this device last pulled/pushed
-const DATA_KEYS = ['tasks', 'projects', 'notes', 'files', 'drive', 'habits', 'transactions', 'journal', 'plans', 'learning', 'events', 'plannerSessions', 'chat', 'chatHistory', 'xp', 'notifyMuted', 'nowLearn', 'settings'];
+const DATA_KEYS = ['tasks', 'projects', 'notes', 'files', 'drive', 'habits', 'transactions', 'journal', 'plans', 'learning', 'events', 'reminders', 'plannerSessions', 'chat', 'chatHistory', 'xp', 'notifyMuted', 'nowLearn', 'settings'];
 const PUSH_DELAY = 2500;
 const POLL_MS = 2 * 60 * 1000;
 
 const readMeta = () => { try { return JSON.parse(localStorage.getItem(META_KEY)) ?? {}; } catch { return {}; } };
 const writeMeta = (m) => { try { localStorage.setItem(META_KEY, JSON.stringify(m)); } catch { /* storage may be full or blocked */ } };
 
-export const hasData = (s) => ['tasks', 'projects', 'notes', 'habits', 'transactions', 'journal', 'events', 'learning', 'drive', 'plannerSessions'].some((k) => (s[k]?.length ?? 0) > 0);
-export const countOf = (s) => ['tasks', 'projects', 'notes', 'habits', 'events', 'journal'].reduce((a, k) => a + (s[k]?.length ?? 0), 0);
+export const hasData = (s) => ['tasks', 'projects', 'notes', 'habits', 'transactions', 'journal', 'events', 'reminders', 'learning', 'drive', 'plannerSessions'].some((k) => (s[k]?.length ?? 0) > 0);
+export const countOf = (s) => ['tasks', 'projects', 'notes', 'habits', 'events', 'reminders', 'journal'].reduce((a, k) => a + (s[k]?.length ?? 0), 0);
 
 // ?sync=KEY or #sync=KEY → remember it, clean the address bar
 export function adoptKeyFromUrl(store) {

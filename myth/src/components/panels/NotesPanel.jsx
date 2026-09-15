@@ -25,7 +25,7 @@ export function NoteEditor({ note, onClose }) {
       const fresh = state.notes.find((n) => n.id === note.id) ?? note;
       const result = await aiMeetingSummary(fresh, state);
       if (!result) {
-        notifications.show({ color: 'orange', title: 'AI model not reachable', message: 'Start Ollama on this device (Settings → AI brain) and try again.' });
+        notifications.show({ color: 'orange', title: 'AI model not reachable', message: 'Check the AI provider in Settings → AI brain and try again.' });
       } else {
         const stamp = `— AI summary (${result.model}) —\n${result.text.trim()}`;
         const existing = (fresh.body ?? '').replace(/— AI summary[\s\S]*$/, '').trim();

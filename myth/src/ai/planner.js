@@ -13,22 +13,28 @@ export const MODES = {
   trip: { label: 'Trip', color: '#1971c2', hint: 'Start, destination, dates → itineraries, weather, stays, fuel, then live guidance on the road.' },
   event: { label: 'Event', color: '#e64980', hint: 'Wedding, party, conference → budget, venue, guests, run-of-show.' },
   study: { label: 'Study / exam', color: '#7048e8', hint: 'Syllabus → practice → mocks → revision, scheduled to the exam date.' },
-  fitness: { label: 'Fitness', color: '#e8590c', hint: 'A race or a goal → base, build, peak, taper.' },
+  fitness: { label: 'Fitness', color: '#e8590c', hint: 'A race or a goal → base, build, peak, taper, with a weekly training plan.' },
+  food: { label: 'Food & diet', color: '#2f9e44', hint: 'A goal and a diet → a 7-day meal plan, grocery list and daily targets.' },
+  finance: { label: 'Money goal', color: '#0ca678', hint: 'Save or pay off an amount by a date → a month-by-month schedule.' },
   business: { label: 'Business', color: '#1b5a38', hint: 'Validate, plan, set up, brand, build, launch.' },
   website: { label: 'Website / app', color: '#0D2D1C', hint: 'Research, content, design, build, test, launch.' },
   writing: { label: 'Writing', color: '#5f3dc4', hint: 'Outline, research, draft, edit, format, publish.' },
   home: { label: 'Home', color: '#f08c00', hint: 'Renovation or a move — scope, design, contractors, execution.' },
   career: { label: 'Career', color: '#1098ad', hint: 'Direction, profile, preparation, applications, offer.' },
+  routine: { label: 'Routine', color: '#9c36b5', hint: 'A daily or weekly rhythm — mornings, deep work, evenings — that actually sticks.' },
   generic: { label: 'Project', color: '#495057', hint: 'Define, research, plan, build, review, deliver.' },
 };
 // mode → projectPlanner template key
-export const MODE_TEMPLATE = { event: 'event', study: 'learning', fitness: 'fitness', business: 'business', website: 'website', writing: 'content', home: 'home', career: 'career', generic: 'generic', trip: 'travel' };
+export const MODE_TEMPLATE = { event: 'event', study: 'learning', fitness: 'fitness', food: 'food', finance: 'finance', business: 'business', website: 'website', writing: 'content', home: 'home', career: 'career', routine: 'routine', generic: 'generic', trip: 'travel' };
 
 const MODE_WORDS = [
   ['trip', /\b(?:trip|travel(?:ling)?|vacation|holiday|tour|road\s*trip|drive\s+to|fly(?:ing)?\s+to|ride\s+to|going\s+to|visit(?:ing)?|getaway|weekend\s+(?:in|at)|pilgrimage|trek(?:king)?|honeymoon|backpack\w*|itinerary|from\s+\w+.*\bto\s+\w+)\b/i],
   ['event', /\b(?:wedding|marriage|reception|engagement|party|conference|meetup|workshop|hackathon|birthday|anniversary|function|ceremony|celebration|fundraiser|expo|event)\b/i],
+  ['food', /\b(?:diet|meal\s*(?:plan|prep)|meal\s+planning|nutrition|eat(?:ing)?\s+(?:healthy|healthier|clean|better)|calorie\w*|keto|vegan|vegetarian|intermittent\s+fasting|protein\s+intake|weekly\s+menu|food\s+plan|recipes?\s+for\s+the\s+week|cut\s+sugar|healthy\s+eating)\b/i],
+  ['finance', /\b(?:save\s+(?:up\s+)?(?:₹|rs\.?\s*)?\d|savings?\s+(?:goal|plan|target)|emergency\s+fund|pay\s+off|clear\s+(?:my\s+|the\s+)?(?:loan|debt|credit\s+card)|debt[- ]free|invest(?:ing|ment)?\s+plan|start\s+(?:a\s+)?sip|mutual\s+funds?|retire\w*|financial\s+(?:plan|goal|freedom)|money\s+goal|down\s*payment|monthly\s+budget|budget\s+plan|build\s+(?:a\s+)?corpus)\b/i],
+  ['routine', /\b(?:routine|daily\s+schedule|weekly\s+schedule|morning\s+ritual|evening\s+ritual|wake\s+up\s+(?:at|earlier|early)|sleep\s+schedule|time\s*table|timetable|structure\s+my\s+(?:day|week)|plan\s+my\s+(?:day|week|mornings|evenings))\b/i],
   ['study', /\b(?:exam|study|syllabus|learn\w*|course|certification|certificate|degree|semester|test\s+prep|prepare\s+for|revision|mock\s+test|gate|neet|jee|upsc|ielts|toefl|gre|gmat)\b/i],
-  ['fitness', /\b(?:marathon|10k|5k|half\s+marathon|triathlon|workout|gym|fitness|weight\s+loss|lose\s+\d+|gain\s+muscle|training\s+plan|cycling|swim\w*|get\s+fit)\b/i],
+  ['fitness', /\b(?:marathon|10k|5k|half\s+marathon|triathlon|workout|gym|fitness|weight\s+loss|lose\s+\d+|gain\s+muscle|training\s+plan|cycling|swim\w*|get\s+fit|yoga|abs|push[- ]?ups?|strength)\b/i],
   ['website', /\b(?:website|web\s*site|landing\s+page|web\s+app|app|application|saas|platform|dashboard|prototype|mvp|software|portfolio)\b/i],
   ['writing', /\b(?:book|novel|ebook|thesis|dissertation|blog|newsletter|podcast|youtube\s+channel|screenplay|manuscript)\b/i],
   ['business', /\b(?:business|startup|company|shop|store|brand|agency|freelanc\w*|side\s+hustle|cafe|café|restaurant|bakery|boutique|e-?commerce)\b/i],
@@ -152,9 +158,10 @@ const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.rou
 const isIndoor = (p) => /museum|gallery|aquarium|temple|palace|mall|church|mosque|monument/i.test(`${p.sub} ${p.name}`);
 const isNature = (p) => /beach|waterfall|peak|park|garden|viewpoint|nature|lake|cave|hot spring/i.test(`${p.sub} ${p.name}`);
 
+// Every style becomes an itinerary — the one asked for comes first.
 function variantKinds(style) {
-  const order = [style, 'balanced', 'relaxed', 'adventure', 'budget'];
-  return [...new Set(order)].slice(0, 4);
+  const order = [style, 'balanced', 'relaxed', 'adventure', 'budget', 'luxury', 'foodie', 'family'];
+  return [...new Set(order)].filter((k) => STYLE_META[k]);
 }
 
 // Estimate a trip's cost in rupees. `route` may be null (flight/train/unknown distance).

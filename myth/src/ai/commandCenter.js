@@ -5,7 +5,6 @@
 // screen, the assistant and node tests. Every function takes an optional
 // `now` (dayjs) so results are deterministic when testing.
 import dayjs from 'dayjs';
-import { upcomingMeetingContexts, followUpsNeeded } from './context.js';
 
 export const DAY_START = 8 * 60;  // 08:00 — the day starts counting here
 export const DAY_END = 21 * 60;   // 21:00 — focus time is measured until here
@@ -168,29 +167,6 @@ export function attentionItems(state, now = dayjs()) {
         out.push({ id: `project:${p.id}`, kind: 'deadline', severity: diff <= 0 ? 3 : 2, title: p.name, sub: `${plural(openCount, 'open task')} · ${when}`, ref: { type: 'project', id: p.id }, sort: diff });
       }
     });
-
-  // Context Engine: meetings within two days that have things to prepare, and recent ones without a follow-up
-  upcomingMeetingContexts(state, 2).forEach(({ id, ctx }) => {
-    const c = ctx.counts;
-    const parts = [
-      c.openTasks && plural(c.openTasks, 'open task'),
-      c.documents && plural(c.documents, 'doc'),
-      c.unresolvedActions && plural(c.unresolvedActions, 'unresolved action'),
-    ].filter(Boolean);
-    if (!parts.length) return;
-    const isToday = ctx.when.date === key;
-    out.push({
-      id: `prep:${id}`, kind: 'prep', severity: isToday ? 2 : 1, title: `Prep: ${ctx.node.label}`,
-      sub: `${isToday ? 'today' : ctx.when.rel.toLowerCase()}${ctx.when.time ? ` ${ctx.when.time}` : ''} · ${parts.join(' · ')}`,
-      ref: { type: 'context', id }, sort: isToday ? 2 : 3,
-    });
-  });
-  followUpsNeeded(state, 3).forEach(({ id, ctx }) => {
-    out.push({
-      id: `followup:${id}`, kind: 'followup', severity: 1, title: `Follow up: ${ctx.node.label}`,
-      sub: `met ${ctx.when.rel.toLowerCase()} · no follow-up task yet`, ref: { type: 'context', id, followup: true }, sort: 4,
-    });
-  });
 
   if (now.hour() >= 18) {
     const missed = (state.habits ?? []).filter((h) => !h.log?.[key]);

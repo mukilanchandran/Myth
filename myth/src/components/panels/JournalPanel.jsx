@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import { useStore } from '../../store/useStore';
 import EmptyState from '../EmptyState';
 import { resolveAI } from '../../ai/assistant';
-import { streamChat } from '../../ai/ollama';
+import { streamChat } from '../../ai/llm';
 
 const MOODS = [
   { value: 5, label: 'great', icon: IconMoodHappy, color: '#0D2D1C' },
@@ -37,7 +37,7 @@ export default function JournalPanel() {
       const state = useStore.getState();
       const ai = await resolveAI(state);
       if (!ai.ok) {
-        notifications.show({ color: 'orange', title: 'AI model not reachable', message: 'Start Ollama to draft recaps automatically.' });
+        notifications.show({ color: 'orange', title: 'AI model not reachable', message: 'Connect an AI provider in Settings → AI brain to draft recaps automatically.' });
         return;
       }
       const todayKey = dayjs().format('YYYY-MM-DD');

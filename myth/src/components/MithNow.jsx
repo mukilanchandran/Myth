@@ -15,13 +15,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import dayjs from 'dayjs';
 import {
   IconBolt, IconPlayerPlay, IconCheck, IconPlayerStop, IconArrowForward, IconSparkles,
-  IconClockHour4, IconArrowsShuffle, IconBrain, IconCircleCheck, IconMoonStars, IconRefresh, IconCalendarEvent,
+  IconClockHour4, IconArrowsShuffle, IconCircleCheck, IconMoonStars, IconRefresh, IconCalendarEvent,
 } from '@tabler/icons-react';
 import { useStore } from '../store/useStore';
-import { useUI } from '../store/useUI';
 import { mithNow, currentWindow } from '../ai/mithNow';
 import { aiMithNow } from '../ai/assistant';
-import { setActionItemDone, contextFor, createFollowUpTask } from '../ai/context';
 import { fmtDuration } from '../ai/commandCenter';
 import { APP_NAME } from '../config/env';
 import './mithNow.css';
@@ -81,7 +79,6 @@ export default function MithNowSheet({ opened, onClose, onOpen }) {
   const state = useStore();
   const { nowStart, nowSkip, nowFinish, clearNowSession, completeTask, togglePlanItem, toggleHabit } = state;
   const session = state.nowSession;
-  const openContext = useUI((s) => s.openContext);
   const mobile = useMediaQuery('(max-width: 768px)');
 
   const [now, setNow] = useState(() => dayjs());
@@ -165,11 +162,6 @@ export default function MithNowSheet({ opened, onClose, onOpen }) {
     if (q.kind === 'task') completeTask(q.id);
     else if (q.kind === 'plan') togglePlanItem(q.id);
     else if (q.kind === 'habit') toggleHabit(q.id);
-    else if (q.kind === 'action') setActionItemDone(useStore, q.noteId, q.idx, true);
-    else if (q.kind === 'followup') {
-      const c = contextFor(useStore.getState(), q.contextId);
-      if (c) createFollowUpTask(useStore, c);
-    }
     notifications.show({ color: 'forest', title: 'Quick win', message: q.title });
   };
   const finish = () => {
@@ -217,7 +209,6 @@ export default function MithNowSheet({ opened, onClose, onOpen }) {
               result={result} ai={ai} aiBusy={aiBusy} prefer={prefer}
               onStart={start} onSkip={skip} onDone={doneAlready} onQuick={tickQuick}
               onPrefer={(id) => setPrefer(id)} onOpen={(p) => { onClose(); onOpen?.(p); }}
-              onPrep={(id) => { onClose(); openContext(id); }}
             />
           </motion.div>
         )}
@@ -229,7 +220,7 @@ export default function MithNowSheet({ opened, onClose, onOpen }) {
 // -------------------------------------------------------------------------
 // advice: "You have 47 minutes before your next meeting."
 // -------------------------------------------------------------------------
-function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQuick, onPrefer, onOpen, onPrep }) {
+function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQuick, onPrefer, onOpen }) {
   const { window: w, primary, quick, remaining, alternatives, mood, learn } = result;
   const nextLine = w.next
     ? `${w.next.kind === 'meeting' ? 'Meeting' : 'Next'}: ${w.next.title} at ${w.next.at}`
@@ -244,11 +235,6 @@ function AdviceView({ result, ai, aiBusy, prefer, onStart, onSkip, onDone, onQui
           <Group gap={6} mt={6}>
             <IconCalendarEvent size={14} color="#7048e8" />
             <Text fz={12.5} c="dimmed">{nextLine}</Text>
-            {w.next?.kind === 'meeting' && (
-              <Button size="compact-xs" variant="subtle" color="grape" leftSection={<IconBrain size={12} />} onClick={() => onPrep(`${w.next.source === 'note' ? 'note' : 'event'}:${w.next.id}`)}>
-                Prep
-              </Button>
-            )}
           </Group>
         )}
       </Box>

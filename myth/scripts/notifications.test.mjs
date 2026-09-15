@@ -187,10 +187,9 @@ test('performAction writes through the store', () => {
     updateTask: (id, patch) => calls.push(['updateTask', id, patch]),
     addTask: (t) => calls.push(['addTask', t]),
   }) };
-  const ui = { setPanel: (p) => calls.push(['panel', p]), openContext: (id) => calls.push(['context', id]) };
+  const ui = { setPanel: (p) => calls.push(['panel', p]) };
   assert.match(performAction({ type: 'block', taskId: 't1', title: 'Proposal', start: '10:00', end: '12:00', minutes: 120 }, store, ui), /Blocked 10:00–12:00/);
   assert.match(performAction({ type: 'move', taskIds: ['t1', 't2'], date: TOMORROW }, store, ui), /Moved 2 tasks to /);
   performAction({ type: 'open', panel: 'tasks' }, store, ui);
-  performAction({ type: 'context', id: 'note:n1' }, store, ui);
-  assert.deepEqual(calls.map((c) => c[0]), ['applyPlan', 'updateTask', 'updateTask', 'panel', 'context']);
+  assert.deepEqual(calls.map((c) => c[0]), ['applyPlan', 'updateTask', 'updateTask', 'panel']);
 });

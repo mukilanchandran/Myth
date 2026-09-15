@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { APP_PASSWORD, AI_MODEL } from '../config/env';
 import { buildPlan, createProjectFromPlan } from '../ai/projectPlanner';
 import { emptyLearn, learnSkip, learnStart, learnFinish } from '../ai/mithNow';
+import { completePatch } from '../ai/reminders';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 export const today = () => dayjs().format('YYYY-MM-DD');
@@ -34,6 +35,12 @@ export const useStore = create(
         aiEndpoint: '',
         aiModel: AI_MODEL, // empty = auto-pick the best installed model
         aiKey: '',
+        // Planner search brain: an optional dedicated ChatGPT (OpenAI) key so the
+        // trip planner's destination research uses a strong model even when the
+        // everyday assistant runs on a free provider. Empty = same brain as chat.
+        plannerAiEndpoint: '',
+        plannerAiKey: '',
+        plannerAiModel: '',
         cloudKey: '', // Netlify sync key (= MYTH_SYNC_KEY on the site) — Settings → Cloud storage & sync
         cloudUrl: '', // optional Netlify site URL when the app runs elsewhere (dev server, Docker)
         notifications: true,
@@ -139,7 +146,12 @@ export const useStore = create(
       // ---------- files (meta only; blobs live in IndexedDB) ----------
       files: [],
       addFileMeta: (f) => set((s) => ({ files: [{ id: uid(), created: new Date().toISOString(), ...f }, ...s.files] })),
-      deleteFileMeta: (id) => set((s) => ({ files: s.files.filter((f) => f.id !== id) })),
+      updateFileMeta: (id, patch) => set((s) => ({ files: s.files.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
+      deleteFileMeta: (id) =>
+        set((s) => ({
+          files: s.files.filter((f) => f.id !== id),
+          learning: s.learning.map((l) => ((l.fileIds ?? []).includes(id) ? { ...l, fileIds: l.fileIds.filter((x) => x !== id) } : l)),
+        })),
 
       // ---------- drive (private vault: screenshots, files, passwords, links) ----------
       drive: [],
@@ -247,9 +259,22 @@ export const useStore = create(
 
       // ---------- learning pipeline ----------
       // stages: 0 want-to-learn, 1 learning, 2 applied, 3 taught/shared
+      // an item may carry notes, attached files (ids in `files`) and links —
+      // the assistant fills these when you hand it a PDF or ask for a study sheet
       learning: [],
-      addLearning: (title) =>
-        set((s) => ({ learning: [...s.learning, { id: uid(), title, stage: 0, created: new Date().toISOString() }] })),
+      addLearning: (titleOrItem) => {
+        const extra = typeof titleOrItem === 'string' ? { title: titleOrItem } : titleOrItem ?? {};
+        const item = { id: uid(), title: '', stage: 0, notes: '', fileIds: [], links: [], created: new Date().toISOString(), ...extra };
+        set((s) => ({ learning: [...s.learning, item] }));
+        return item;
+      },
+      updateLearning: (id, patch) =>
+        set((s) => ({ learning: s.learning.map((l) => (l.id === id ? { ...l, ...patch } : l)) })),
+      attachToLearning: (id, fileId) =>
+        set((s) => ({
+          learning: s.learning.map((l) => (l.id === id && !(l.fileIds ?? []).includes(fileId) ? { ...l, fileIds: [...(l.fileIds ?? []), fileId] } : l)),
+          files: s.files.map((f) => (f.id === fileId ? { ...f, learningId: id } : f)),
+        })),
       moveLearning: (id, dir) =>
         set((s) => ({
           learning: s.learning.map((l) =>
@@ -270,6 +295,32 @@ export const useStore = create(
       deleteEvent: (id) => set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
       updateEvent: (id, patch) =>
         set((s) => ({ events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+
+      // ---------- reminders ----------
+      // { id, title, note, date, time|null, repeat: none|daily|weekdays|weekly|monthly|yearly,
+      //   category, done, doneAt, snoozedUntil, timesDone, lastDoneAt, source, created }
+      reminders: [],
+      addReminder: (r) => {
+        const id = uid();
+        set((s) => ({
+          reminders: [
+            { id, title: '', note: '', date: today(), time: null, repeat: 'none', category: 'personal', done: false, doneAt: null, snoozedUntil: null, timesDone: 0, source: 'manual', created: new Date().toISOString(), ...r },
+            ...(s.reminders ?? []),
+          ],
+        }));
+        get().addXp('capture');
+        return id;
+      },
+      updateReminder: (id, patch) =>
+        set((s) => ({ reminders: (s.reminders ?? []).map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
+      // a one-off closes; a repeat rolls forward to its next date (see ai/reminders.js)
+      completeReminder: (id) =>
+        set((s) => ({ reminders: (s.reminders ?? []).map((r) => (r.id === id ? { ...r, ...completePatch(r) } : r)) })),
+      snoozeReminder: (id, until) =>
+        set((s) => ({ reminders: (s.reminders ?? []).map((r) => (r.id === id ? { ...r, snoozedUntil: until } : r)) })),
+      reopenReminder: (id) =>
+        set((s) => ({ reminders: (s.reminders ?? []).map((r) => (r.id === id ? { ...r, done: false, doneAt: null, snoozedUntil: null } : r)) })),
+      deleteReminder: (id) => set((s) => ({ reminders: (s.reminders ?? []).filter((r) => r.id !== id) })),
 
       // ---------- Life Command Center: focus blocks ----------
       // "Follow the plan" turns the suggested blocks into calendar events of
@@ -430,7 +481,7 @@ export const useStore = create(
     }),
     {
       name: 'myth-db',
-      version: 7,
+      version: 9,
       // ask for the password on every visit — auth state is session-only
       partialize: (s) => Object.fromEntries(Object.entries(s).filter(([k]) => !['authed', 'pendingProposal', 'syncState', 'syncError', 'lastSyncAt', 'syncConflict'].includes(k))),
       migrate: (persisted, version) => {
@@ -493,6 +544,20 @@ export const useStore = create(
           persisted.settings.quietStart ??= 22;
           persisted.settings.quietEnd ??= 7;
           persisted.notifyMuted ??= {};
+        }
+        if (version < 8 && persisted) {
+          // v8: learning items can hold notes, files and links; the planner may use its own ChatGPT key
+          if (Array.isArray(persisted.learning)) {
+            persisted.learning = persisted.learning.map((l) => (l && typeof l === 'object' ? { notes: '', fileIds: [], links: [], ...l } : l));
+          }
+          persisted.settings ??= {};
+          persisted.settings.plannerAiEndpoint ??= '';
+          persisted.settings.plannerAiKey ??= '';
+          persisted.settings.plannerAiModel ??= '';
+        }
+        if (version < 9 && persisted) {
+          // v9: reminders
+          persisted.reminders ??= [];
         }
         return persisted;
       },

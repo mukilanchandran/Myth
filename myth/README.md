@@ -1,17 +1,63 @@
 # Myth — Personal OS
 
 A single-page personal management platform. No sidebar tabs — one landing page with a
-capture bar that sorts everything you type or speak into the right place, and a private
-AI assistant that runs entirely on your own machine.
+home bar where Myth AI sorts everything you type or speak into the right place, answers
+questions and acts on your data, and a Planner one tab away.
 
 ---
 
+## What's new — two tabs on the home bar, Myth AI everywhere, a Planner that researches
+
+**The home bar has two tabs.** Two folder-style tabs rest on the bar — Myth AI and Planner — the
+active one filled with its mode's colour and running straight into the bar. Press `Ctrl+.` to flip,
+or type `/chat`, `/plan` or `/trip` straight into the bar. There is no separate Capture mode any
+more: Myth AI does the sorting itself, and today's plan lives inside the Myth AI box under the bar.
+
+| Mode | What typing does |
+|---|---|
+| **Myth AI** | Plain sentences get sorted into tasks, meetings, money, habits, ideas…; questions get answers; instructions get done (below). Paperclip / paste / drop to hand it files. The box under the bar carries today's plan pills and the conversation, over a living animated backdrop. |
+| **Planner** | Myth Planner lives here now. A strip of plan types — trip, event, study, fitness, food & diet, money goal, business, website, writing, home, career, routine, anything — each with a short form (the trip one has From / To place autocomplete: type "ko" and pick Kodaikanal) and one-tap examples. The plan opens right under the bar; short follow-ups typed in the bar edit it ("budget 40k", "move it to March", "start trip"). |
+
+Every non-trip plan gets a dated milestone schedule **plus a playbook for that kind of plan**: an
+offline widget that works with no model (a training week sized to your sessions and level, a 7-day
+Indian meal rotation for the diet and goal, a month-by-month savings schedule against your income, a
+study-hours budget, an event budget split with per-head cost, an hour-by-hour routine day) and, from the
+planner brain, mode-specific sections — weekly syllabus tables, mock-test schedules, grocery lists,
+vendor checklists and run-of-show, startup costs, sitemaps and launch checklists, skills-gap tables,
+habit stacks — rendered as lists, tickable checklists, tables and schedules
+([`src/ai/planGuide.js`](src/ai/planGuide.js)).
+
+**Myth AI can do everything in the platform, from anywhere.** A floating Myth button follows you into
+every module on desktop (`Ctrl+J`; phones use the centre tab). Ask, or tell it what to do — it runs real
+actions and reports each one with a ✅ line:
+
+- "Add task pay rent on the 1st", "log 250 for lunch", "habit: read 20 pages", "meeting with Ravi Friday 3pm"
+- Hand it a PDF and say **"add this file to learning"** — the file lands on a Learning card (with its notes),
+  or "…to project Acme", "…to drive", "…to notes"
+- **"Make a cheat sheet on SQL joins and add it to learning"** — it writes the document and saves it as a
+  real file (PDF, Markdown, text, CSV, HTML or JSON) where you asked
+- "Create project portfolio website with a plan", "move React hooks to applied", "plan a trip to Goa in Dec"
+
+The model asks for actions with a small fenced block at the end of its answer (see
+[`src/ai/actions.js`](src/ai/actions.js) for the catalogue); the everyday file sentences also work with no
+model at all. Learning cards now hold notes, attached files and links, with an "ask Myth for a study
+sheet" button on each.
+
+**Myth Planner researches the destination.** A trip now comes back with every road option (OSRM
+alternatives, named by highway), every way to get there with time and cost, areas to stay in, stays across
+budget / mid / luxury, must-sees and hidden gems, what to eat, events around your dates, tips — plus
+itineraries for all seven styles and several themed ones (nature, heritage, food…), each with a map link
+per stop. The research runs on the model: paste an OpenAI key in **Settings → Planner search brain** to
+use ChatGPT for it (the everyday chat can stay on a free provider), or leave it empty to use the AI brain.
+OpenAI is also available as a regular provider in **Settings → AI brain**.
+
 ## What's new — the intelligence layer
 
-Myth now has a Context Engine, a Life Command Center, an agent that prepares your meetings, morning/evening
-briefings, energy-aware auto-planning, Focus mode, a Life Inbox with confidence-gated AI, people & promise
-memory, goals, a life timeline, Ask-My-Life, analytics, a monthly life story, a Privacy Center and an
-API/MCP bridge. Read [docs/INTELLIGENCE-LAYER.md](docs/INTELLIGENCE-LAYER.md).
+Myth has a Life Command Center, morning/evening briefings, energy-aware auto-planning, a Life Inbox with
+confidence-gated AI, goals, a life timeline, Ask-My-Life, analytics, a monthly life story, a Privacy Center
+and an API/MCP bridge. Read [docs/INTELLIGENCE-LAYER.md](docs/INTELLIGENCE-LAYER.md). Meetings are plain
+calendar entries — "client meeting tomorrow 10am at Acme with Ravi" lands on the calendar with the place
+and the people, and that is all; there is no separate meeting-prep or context feature.
 
 ## Quick start
 
@@ -22,9 +68,8 @@ npm run dev          # http://localhost:5173
 
 Lock-screen password: `mukilx` (change it — see [Configuration](#configuration)).
 
-**AI answers work out of the box** — with nothing configured, Myth auto-connects to
-local Ollama when it's running (private), otherwise to the free keyless
-[LLM7](https://llm7.io) cloud. No account, no API key, no cost.
+**AI answers work out of the box** — with nothing configured, Myth auto-connects to the
+free keyless [LLM7](https://llm7.io) cloud. No account, no API key, no cost.
 
 Want a specific provider instead? In *Settings → AI brain* pick one and paste a free
 API key (2-minute signup, no credit card):
@@ -35,15 +80,6 @@ API key (2-minute signup, no credit card):
 | **Groq** (recommended, fastest) | [console.groq.com/keys](https://console.groq.com/keys) | Llama 3.3 70B, GPT-OSS 120B… |
 | **OpenRouter** | [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) | NVIDIA Nemotron, GPT-OSS, Gemma (":free" models) |
 | **Google Gemini** | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Gemini 2.5 Flash |
-
-**Local (private, offline — this device only)** — install [Ollama](https://ollama.com) and pull a model:
-
-```bash
-ollama pull llama3.2      # 3B — fast on CPU
-ollama pull llama3.1:8b   # 8B — better answers, slower
-```
-
-The app auto-detects Ollama on `localhost:11434`. Nothing to configure.
 
 ---
 
@@ -64,7 +100,7 @@ myth/
 │
 ├── src/
 │   ├── ai/                     # all intelligence lives here
-│   │   ├── ollama.js           # transport: detect, rank models, stream, warm-up
+│   │   ├── llm.js              # transport: detect, rank models, stream
 │   │   ├── assistant.js        # prompts, live-data context, offline fallback brain
 │   │   ├── parser.js           # natural-language capture → tasks/events/expenses
 │   │   ├── insights.js         # month stats + narrative report generation
@@ -99,7 +135,7 @@ myth/
 ├── .github/workflows/
 │   └── deploy-pages.yml        # build + publish to GitHub Pages
 │
-├── docker-compose.yml          # app + Ollama, one command
+├── docker-compose.yml          # the app in a container, one command
 ├── netlify.toml                # Netlify build + SPA redirects + headers
 ├── vercel.json                 # Vercel equivalent
 ├── .env.example                # copy to .env.local
@@ -118,9 +154,8 @@ the JavaScript bundle — treat every one of them as public.
 |---|---|---|
 | `VITE_APP_NAME` | `Myth` | Name in the lock screen and notifications |
 | `VITE_APP_PASSWORD` | `mukilx` | Lock-screen password |
-| `VITE_AI_ENDPOINT` | `http://localhost:11434/v1` | Any OpenAI-compatible endpoint |
-| `VITE_AI_MODEL` | *(empty)* | Preferred model; empty auto-picks the best installed |
-| `VITE_AI_WARMUP` | `true` | Keep the model in RAM so answers start in ~1s |
+| `VITE_AI_ENDPOINT` | `https://api.llm7.io/v1` | Any OpenAI-compatible endpoint (free LLM7 by default) |
+| `VITE_AI_MODEL` | *(empty)* | Preferred model; empty auto-picks the best available |
 | `VITE_BASE` | `/` | Subpath, for GitHub Pages project sites only |
 
 > **The password is a convenience lock, not security.** It ships in plain text inside the
@@ -132,20 +167,19 @@ the JavaScript bundle — treat every one of them as public.
 
 ## Deploying
 
-### Docker — app + AI together (recommended for a home server / LAN)
+### Docker Compose (recommended for a home server / LAN)
 
 ```bash
 docker compose up -d --build
-docker compose exec ollama ollama pull llama3.2
 ```
 
-App on <http://localhost:8080>, Ollama on `:11434`. Models persist in a named volume, and
-`OLLAMA_KEEP_ALIVE=1h` keeps the model resident so the first question is fast.
+App on <http://localhost:8080>. AI answers come from the free cloud provider chosen in
+Settings → AI brain (LLM7 by default, no key needed).
 
 Override config without editing files:
 
 ```bash
-APP_PASSWORD=my-secret AI_MODEL=llama3.1:8b docker compose up -d --build
+APP_PASSWORD=my-secret AI_ENDPOINT=https://api.groq.com/openai/v1 docker compose up -d --build
 ```
 
 ### Docker — app only
@@ -237,23 +271,11 @@ card to your Netlify address — the functions accept cross-origin calls.
 
 The browser calls the AI endpoint **directly**. The web server never touches it.
 
-**For a deployed app, use a free cloud provider** (Groq / OpenRouter / Gemini — see
+**Use a free cloud provider** (LLM7 by default, or Groq / OpenRouter / Gemini — see
 [Quick start](#quick-start)): they work from any device, over HTTPS, with a free key each
-user pastes once in Settings → AI brain. The notes below only matter if you insist on
-local Ollama:
-
-1. **`localhost` means the visitor's machine**, not your server. Each person who opens the
-   app needs their own Ollama running, or you must point `VITE_AI_ENDPOINT` at a
-   reachable shared endpoint.
-2. **CORS.** Ollama only answers browsers whose origin it trusts. Set `OLLAMA_ORIGINS` to
-   the address you open the app from — the compose file does this already:
-   ```bash
-   OLLAMA_ORIGINS="http://localhost:8080,https://your-app.example.com"
-   ```
-3. **HTTPS → `http://localhost` is mixed content.** A site served over HTTPS may be
-   blocked from calling a plain-HTTP local endpoint, depending on the browser. Serving
-   the app over plain HTTP on your LAN, or putting the AI endpoint behind HTTPS too,
-   avoids the problem entirely.
+user pastes once in Settings → AI brain. If you point `VITE_AI_ENDPOINT` at a custom
+OpenAI-compatible server instead, it must allow your app's origin (CORS) and be served
+over HTTPS when the app is, or the browser will block the calls.
 
 If the AI is unreachable, nothing breaks: the assistant falls back to its offline brain,
 which answers questions about tasks, priorities, reports, habits and spending without any
@@ -297,6 +319,43 @@ or *"clear the plan"* in the capture bar. The logic is pure (`src/ai/commandCent
 covered by `npm test`.
 
 ---
+
+## Myth Daily Brief — the status card
+
+The hero tile on the home screen is a brief that rewrites itself from live data every minute
+(`src/ai/dailyBrief.js`):
+
+```
+Good morning, Mukil.
+Today               7 tasks · 2 meetings · 1 deadline
+Your focus          Finish homepage design.
+Potential problem   Project X is 2 days behind.
+Personal            Electricity bill due tomorrow.
+Learning            30 min React practice.
+Suggested schedule  09:00 → Deep work — Finish homepage design
+                    11:00 → Design review
+                    12:00 → Admin & inbox
+                    14:00 → Project time
+```
+
+- **Today** counts tasks due by today, meetings and events on the calendar, deadlines (projects
+  and milestones due today or tomorrow, priority-5 tasks due today) and reminders.
+- **Your focus** is what MITH NOW would pick for the current window, else the top "needs
+  attention" item, else the highest-priority open task.
+- **Potential problem** looks for a project behind the calendar (task progress vs. time
+  elapsed, or a slipped milestone), then overdue tasks, an overbooked day, missed reminders, a
+  project due tomorrow with open work, and — in the evening — habits not ticked.
+- **Personal** reads bills and birthdays due today or tomorrow and personal reminders; with
+  none of those it shows the habits still open.
+- **Learning** takes the item currently in the "learning" stage (30 minutes, 20 when several
+  are active), or invites you to start one from "want to learn".
+- **Suggested schedule** merges today's timed events, Myth's focus blocks and — when the
+  calendar is nearly empty — a morning deep-work slot, an admin slot at noon and project time
+  in the afternoon. Past items are struck through; the current one is highlighted.
+
+Each line opens the module it came from. Myth AI carries the same brief (`DATA.dailyBrief`),
+answers "brief me" / "how does my day look" from it offline, and the first open of the day
+before noon shows it as a toast.
 
 ## MITH NOW — "What should I do now?"
 
@@ -435,7 +494,7 @@ tested), `src/ai/geo.js` (services), `src/ai/tripEngine.js` (orchestration).
 
 ## How capture works
 
-Type (or tap the mic and speak) into the landing bar:
+Type (or tap the mic and speak) into the home bar in Myth AI mode:
 
 | You type | What happens |
 |---|---|
@@ -453,6 +512,33 @@ below the bar. Click the sparkle icon to force Ask mode. Work and personal share
 flow — there is no mode to switch.
 
 ---
+
+## Reminders — nudges at the right time
+
+*More → Reminders*, or just say it anywhere: **"remind me to call Ravi tomorrow at 5"**,
+**"pay rent every 1st"**, **"water the plants every evening"**, **"don't forget the dentist on Friday"**.
+The engine (`src/ai/reminders.js`) reads the date, the time and the repeat out of the sentence
+and guesses a category (people, money, health, work, errand, home); the panel previews what it
+understood before you press *Remind me*.
+
+- **Repeats** — daily, weekdays, weekly (on a named day), monthly (on a day of the month), yearly.
+  Marking a repeat done rolls it to its next date and counts the streak; a one-off closes.
+- **Snooze** — 10 min, 1 h, 3 h, this evening, tomorrow 09:00, next Monday. Move a reminder
+  a day or a week, change its repeat, or edit everything in a small form.
+- **Sections** — overdue, today, tomorrow, this week, later; done stays collapsed underneath.
+- **Notifications** — a reminder fires as a system notification at its minute, with a *Done*
+  action, plus a heads-up 30 minutes before a timed one and a morning rundown when the day
+  carries several. Reminders are exempt from the notification budget and the delivery windows;
+  quiet hours only hold back the heads-up, never the alarm itself.
+- **Myth suggests** — reminders proposed from the rest of your data: a 30-minute heads-up before
+  today's meetings, tasks due today or tomorrow, bills and birthdays in the next three days.
+  One tap adds them.
+- **Myth AI** — the assistant sees every reminder (`DATA.reminders`), answers "what are my
+  reminders" / "anything overdue" offline, and can add, complete, snooze, delete and list them
+  through actions. "done with the dentist reminder" and "snooze rent for 2 hours" work without
+  a model too.
+
+Reminders sync with everything else and show up in the bridge's search.
 
 ## Context Engine — the Life Context Graph
 
@@ -548,4 +634,4 @@ Because storage is per-browser, deploying to a URL does not sync data between de
 ## Stack
 
 React 19 · Vite 8 (rolldown) · Mantine 9 · zustand · dayjs + chrono-node ·
-framer-motion · recharts · Web Speech API · Ollama for local AI.
+framer-motion · recharts · Web Speech API · free OpenAI-compatible AI providers.

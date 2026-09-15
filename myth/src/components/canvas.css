@@ -42,11 +42,11 @@
 .canvas-main { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
 .canvas-left, .canvas-main { scrollbar-width: none; } .canvas-left::-webkit-scrollbar, .canvas-main::-webkit-scrollbar { display: none; }
 
-/* the two decision cards sit side by side under the capture bar */
+/* the two decision cards sit side by side under the home bar */
 /* the home block sits in the vertical middle of the canvas when there is room */
 .home { display: flex; flex-direction: column; gap: 14px; margin-block: auto; flex-shrink: 0; width: 100%; }
 /* home: the hero with the two decision cards stacked beside it */
-.home-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; align-items: start; flex-shrink: 0; }
+.home-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; align-items: stretch; flex-shrink: 0; }
 
 /* ---------- cloud sync ---------- */
 .connect-banner {
@@ -66,9 +66,12 @@
   display: inline-block; font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase; font-weight: 800;
   background: rgba(255, 255, 255, 0.2); border-radius: 999px; padding: 2px 8px; margin-right: 8px; vertical-align: 1px;
 }
-.cc-pair { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-height: 0; }
+/* the two cards take the brief's height (contain: size keeps their content out of the row
+   height), share it equally, and scroll inside when they hold more than fits */
+.cc-pair { display: grid; grid-template-rows: 1fr 1fr; gap: 10px; min-height: 240px; contain: size; }
 .cc-pair > * { display: flex; flex-direction: column; min-height: 0; }
-.cc-pair .cc-soft { flex: 1; }
+.cc-pair .cc-soft { flex: 1; min-height: 0; }
+.cc-pair .cc-soft-body { overflow: auto; scrollbar-width: thin; }
 
 /* inside the canvas, glass becomes clean white cards */
 .canvas .cc-card { background: #fff; box-shadow: var(--card-shadow); backdrop-filter: none; -webkit-backdrop-filter: none; }
@@ -78,8 +81,7 @@
 .canvas .glass, .canvas .glass-strong { background: #fff; border: none; box-shadow: var(--card-shadow); backdrop-filter: none; -webkit-backdrop-filter: none; }
 .canvas .hero-sub, .canvas .hero-title { color: var(--ink-2); text-shadow: none; }
 .canvas .capture-input input::placeholder { color: #6f7f76; }
-.canvas .capture-bar { min-height: 74px; }
-.capture-wrap { flex-shrink: 0; max-width: 640px; margin: 0 auto; }
+/* the home bar itself (tabs + bar) lives in deck.css; the Myth AI box in chat/inlineChat.css */
 
 /* ---------- the hero: a frosted-glass control panel over the backdrop ---------- */
 .hero {
@@ -87,13 +89,13 @@
   background: rgba(8, 20, 14, 0.6);
   backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3);
   border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
-  display: grid; grid-template-columns: 1fr; padding: 10px;
+  display: grid; grid-template-columns: 1fr; padding: 8px;
 }
 .hg-tile {
-  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 10px 12px;
 }
-.hg-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.hero-eyebrow { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; color: rgba(255, 255, 255, 0.68); }
+.hg-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.hero-eyebrow { font-size: 9px; letter-spacing: 1.8px; text-transform: uppercase; font-weight: 700; color: rgba(255, 255, 255, 0.68); }
 .hg-big { display: flex; align-items: center; gap: 12px; }
 .hg-pct { font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: -1px; flex-shrink: 0; }
 .hg-pct small { font-size: 15px; font-weight: 700; margin-left: 2px; opacity: 0.8; }
@@ -106,11 +108,34 @@
   background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 8px 11px;
 }
 .hero-quote b { display: block; color: #3ddc84; font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
-.hero-plan { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: rgba(255, 255, 255, 0.82); }
+.hero-plan { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: rgba(255, 255, 255, 0.82); }
 .hero-plan b { font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.6); font-weight: 700; margin-right: 8px; }
-.hero-cta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 2px; }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 0; }
 .hero-cta > div { padding: 0 !important; } /* the Mith Now wrapper */
 .hero .mith-now-btn ~ * { display: none; } /* its hint line repeats "focus left" — hidden here */
+
+/* ---------- the Myth Daily Brief inside the hero ---------- */
+.brief-greeting { font-size: 15px; font-weight: 800; letter-spacing: -0.2px; line-height: 1.15; margin-top: -3px; }
+.brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.brief-item {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; text-align: left; font: inherit; color: inherit;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 5px 9px;
+}
+button.brief-item { cursor: pointer; transition: background 0.14s, border-color 0.14s; }
+button.brief-item:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(255, 255, 255, 0.2); }
+.brief-item.is-wide { grid-column: 1 / -1; }
+.brief-item > b { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 800; color: #3ddc84; }
+.brief-item.is-warn > b { color: #ffb454; }
+.brief-item.is-calm > b { color: rgba(255, 255, 255, 0.55); }
+.brief-item > span { font-size: 11.5px; line-height: 1.35; color: rgba(255, 255, 255, 0.92); overflow-wrap: anywhere; }
+.brief-item.is-focus > span { font-weight: 700; color: #fff; }
+.brief-schedule { margin-top: 2px; }
+.brief-schedule > div { display: flex; align-items: baseline; gap: 6px; padding: 1px 0; }
+.brief-schedule > div > b { margin-right: 0; min-width: 34px; }
+.brief-schedule > div > i { font-style: normal; color: rgba(255, 255, 255, 0.45); }
+.brief-schedule > div.is-past { opacity: 0.5; text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, 0.4); }
+.brief-schedule > div.is-now { color: #fff; font-weight: 700; }
+.brief-schedule > div.is-now > b { color: #3ddc84; }
 .hg-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .hg-stat { padding: 7px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.1); }
 .hg-stat b { display: block; font-size: 14px; font-weight: 800; line-height: 1.1; }
@@ -121,16 +146,19 @@
 /* ---------- soft cards (the left column) ---------- */
 .cc-soft {
   position: relative; overflow: hidden; display: flex; flex-direction: column;
-  border-radius: 22px; padding: 16px 16px 14px; min-height: 0;
+  border-radius: 18px; padding: 12px 13px 11px; min-height: 0;
   background: linear-gradient(160deg, var(--soft-a) 0%, var(--soft-b) 100%);
   box-shadow: var(--card-shadow);
 }
 .cc-soft-art { position: absolute; right: 2px; top: 2px; pointer-events: none; }
-.cc-soft-title { position: relative; font-weight: 800; font-size: 16px; letter-spacing: -0.3px; color: var(--ink-2); line-height: 1.15; max-width: calc(100% - 70px); }
-.cc-soft-desc { position: relative; font-size: 12.5px; line-height: 1.4; font-weight: 500; color: rgba(15, 31, 23, 0.7); margin-top: 4px; max-width: calc(100% - 64px); }
-.cc-soft-body { position: relative; margin-top: 10px; flex: 1; min-height: 0; overflow: hidden; }
-.cc-soft-foot { position: relative; margin-top: 10px; }
-.cc-soft .cc-item { background: rgba(255, 255, 255, 0.62); padding: 6px 9px; }
+.cc-soft-title { position: relative; font-weight: 800; font-size: 14px; letter-spacing: -0.3px; color: var(--ink-2); line-height: 1.15; max-width: calc(100% - 70px); }
+.cc-soft-desc { position: relative; font-size: 11.5px; line-height: 1.35; font-weight: 500; color: rgba(15, 31, 23, 0.7); margin-top: 4px; max-width: calc(100% - 64px); }
+.cc-soft-body { position: relative; margin-top: 8px; flex: 1; min-height: 0; overflow: hidden; }
+.cc-soft-foot { position: relative; margin-top: 8px; }
+.cc-soft-foot .mantine-Button-root { height: 34px; font-size: 13px; }
+.cc-soft .cc-item { background: rgba(255, 255, 255, 0.62); padding: 5px 8px; }
+.cc-soft .cc-item .mantine-Text-root { font-size: 12px; }
+.cc-soft .cc-timeline .mantine-Text-root { font-size: 12px; }
 .cc-soft .cc-timeline::before { background: rgba(15, 31, 23, 0.1); }
 .cc-soft .cc-timeline .cc-row svg { background: rgba(255, 255, 255, 0.85); }
 
@@ -191,6 +219,47 @@
 .empty-title { font-weight: 800; font-size: 15px; color: var(--ink-2); margin-top: 6px; }
 .empty-hint { font-size: 13px; color: #6f7f76; max-width: 320px; }
 
+/* ---------- the floating Myth AI (desktop): a small launcher in the corner + a compact panel above it ---------- */
+.ai-dock {
+  position: fixed; right: 22px; bottom: 22px; z-index: 61; width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #0D2D1C, #1b5a38); display: grid; place-items: center;
+  box-shadow: 0 10px 26px rgba(13, 45, 28, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.ai-dock[data-open] { background: #0f1f17; }
+.ai-dock-pulse { position: absolute; inset: -4px; border-radius: 50%; border: 2px solid rgba(61, 220, 132, 0.55); animation: aiDockPulse 2.6s ease-out infinite; pointer-events: none; }
+@keyframes aiDockPulse { 0% { transform: scale(0.9); opacity: 0.9; } 100% { transform: scale(1.45); opacity: 0; } }
+/* the panel: no overlay, no blur — everything behind it keeps working */
+.ai-panel {
+  position: fixed; right: 100px; bottom: 22px; z-index: 60; width: 340px; max-width: calc(100vw - 140px);
+  height: min(480px, calc(100vh - 120px)); display: flex; flex-direction: column; overflow: hidden;
+  background: #fff; border-radius: 22px; padding: 12px 14px 12px; transform-origin: bottom right;
+  box-shadow: 0 24px 64px rgba(20, 45, 33, 0.28), 0 0 0 1px rgba(13, 45, 28, 0.06);
+}
+.ai-panel > * { flex: 1; min-height: 0; }
+@media (prefers-reduced-motion: reduce) { .ai-dock-pulse { animation: none; } }
+
+/* ---------- the planner opened inline under the capture bar ---------- */
+.inline-planner { background: #fff; border-radius: 26px; box-shadow: var(--card-shadow); padding: 18px 22px 22px; flex-shrink: 0; }
+.inline-planner-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.inline-planner-title { font-weight: 800; font-size: 17px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+.inline-planner-sub { font-size: 12.5px; color: #6f7f76; margin-top: 2px; }
+
+/* the plan composer under the bar (Planner mode): a strip of plan types, then the form for the chosen one */
+.plan-composer { background: #fff; border-radius: 22px; padding: 12px 14px 12px; box-shadow: var(--card-shadow); margin-top: 10px; }
+.plan-types { padding-bottom: 10px; }
+.plan-type {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 6px 11px; border-radius: 999px; border: 1px solid #e6ece8; background: #f7f9f8;
+  color: var(--c); font: 700 12px 'Figtree', sans-serif; cursor: pointer; transition: background 140ms ease, color 140ms ease, transform 120ms ease, border-color 140ms ease;
+}
+.plan-type:hover { transform: translateY(-1px); border-color: var(--c); }
+.plan-type[data-active] { background: var(--c); border-color: var(--c); color: #fff; }
+.plan-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; }
+.plan-form .plan-form-go { align-self: end; }
+.plan-composer .mantine-InputWrapper-label, .plan-composer .mantine-DateInput-label { font-size: 11px; font-weight: 700; color: #6f7f76; text-transform: uppercase; letter-spacing: 0.4px; }
+.trip-composer { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr 1fr 0.7fr 0.9fr auto; gap: 8px; align-items: end; background: #fff; border-radius: 22px; padding: 12px 14px; box-shadow: var(--card-shadow); margin-top: 10px; }
+.trip-composer.is-bare { padding: 0; margin: 0; box-shadow: none; border-radius: 0; }
+.trip-composer .mantine-InputWrapper-label, .trip-composer .mantine-DateInput-label { font-size: 11px; font-weight: 700; color: #6f7f76; text-transform: uppercase; letter-spacing: 0.4px; }
+
 /* ---------- tablets and phones: the canvas fills the screen, sections stack ---------- */
 @media (max-width: 999px) {
   .canvas { margin: 0; border-radius: 0; box-shadow: none; }
@@ -200,9 +269,13 @@
   .hg-big { align-items: flex-start; }
   .welcome-h { font-size: 22px; }
   .welcome-line { font-size: 12px; }
-  .canvas .capture-bar { min-height: 54px; }
-  .capture-wrap { max-width: none; }
   .hero-cta { gap: 6px; }
+  .brief-grid { grid-template-columns: 1fr; }
+  .brief-greeting { font-size: 17px; }
   .home-grid { grid-template-columns: 1fr; }
-  .cc-pair { grid-template-rows: none; }
+  .cc-pair { grid-template-rows: none; contain: none; min-height: 0; }
+  .cc-pair .cc-soft-body { overflow: visible; }
+  .trip-composer { grid-template-columns: 1fr 1fr; }
+  .trip-composer > .trip-composer-go { grid-column: 1 / -1; }
+  .inline-planner { padding: 14px 14px 18px; border-radius: 20px; }
 }

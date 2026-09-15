@@ -1,87 +1,134 @@
-import { useEffect, useRef, useState } from 'react';
+// The home bar ("deck"): one input with a small Myth AI / Planner switch inside it.
+//   Myth AI  — ask anything, capture anything, hand it files. Today's plan sits
+//              under the bar; the Myth AI box (chat/InlineChat.jsx) appears only
+//              once something has been asked, and closes back to just the plan.
+//   Planner  — describe a trip, exam, goal or launch in a sentence (or use the
+//              composer under the bar); the plan opens inline under it.
+// "/plan …" or "/chat …" switches tab and sends in one go; Ctrl + . cycles tabs.
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
-import { Box, TextInput, ActionIcon, Group, Text, Tooltip, Chip, Stack, Loader } from '@mantine/core';
-import {
-  IconMicrophone, IconSend, IconMicrophoneFilled, IconListCheck,
-  IconX, IconTrash, IconArrowsDiagonal, IconHistory, IconPlus,
-} from '@tabler/icons-react';
+import { Box, TextInput, ActionIcon, Text, Tooltip } from '@mantine/core';
+import { IconMicrophone, IconMicrophoneFilled, IconSend, IconSparkles, IconCompass } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
-import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
-import { parseMulti, executeCapture } from '../ai/parser';
+import { useUI } from '../store/useUI';
 import { askAssistant } from '../ai/assistant';
-import { detectProjectIntent } from '../ai/projectPlanner';
+import { detectMode } from '../ai/planner';
+import { startPlannerSession, conversePlanner } from '../ai/plannerSession';
+import { useChatFiles } from './chat/useChatFiles';
+import { AttachButton, FileTray } from './chat/FileTray';
+import InlineChat from './chat/InlineChat';
 import DayPlan from './DayPlan';
-import MythBot from './MythBot';
+import PlanComposer from './planner/PlanComposer';
+import './deck.css';
+
+const TABS = [
+  { key: 'chat', label: 'Myth AI', hint: 'Ask, capture, create — anything', icon: IconSparkles, a: '#0D2D1C', b: '#1f7a4d', ink: '#ffffff' },
+  { key: 'planner', label: 'Planner', hint: 'Trips, exams, goals, launches', icon: IconCompass, a: '#f9c04a', b: '#ee9d10', ink: '#1a1408' },
+];
 
 const CHAT_HINTS = [
   'What should I do now?',
-  "Prepare me for tomorrow's meeting",
-  'What should I handle today?',
-  'What are my priorities today?',
+  'Add task: pay rent on the 1st',
+  'Meeting with Ravi tomorrow 10am',
+  'Spent 250 on lunch',
+  'Make a cheat sheet on SQL joins and add it to learning',
   "What's overdue?",
-  'Generate my monthly report',
 ];
 
-// Clear question phrasing — even in Plan mode this deserves an answer, not a task.
-const QUESTION = /^(what|how|which|when|who|why|where|can|could|should|would|is|are|am|do|does|did|tell|explain|show|hi|hey|hello|thanks|thank)\b|^(?:prep(?:are)?\s+me|brief\s+me|get\s+me\s+ready)\b|^(?:follow|apply|accept|go with|clear|cancel|drop)\s+(?:the\s+|your\s+|my\s+|myth'?s?\s+|today'?s?\s+)?(?:plan|focus blocks?)\b|\?$/i;
+// "/plan trip to Goa" → planner tab + send; "/chat …" or "/ai …" → Myth AI tab + send
+const SLASH = /^\/(chat|ai|bot|plan(?:ner)?|trip)\b\s*/i;
+const slashMode = (word) => (/^(plan|planner|trip)$/i.test(word) ? 'planner' : 'chat');
 
-export default function CaptureBar({ onExpand, onChatOpen }) {
+function DeckTabs({ value, onChange, compact = false, thinking = false, plans = 0 }) {
+  const active = Math.max(0, TABS.findIndex((t) => t.key === value));
+
+  // Ctrl/Cmd + . cycles the tabs
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '.') {
+        e.preventDefault();
+        onChange(TABS[(active + 1) % TABS.length].key);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active, onChange]);
+
+  return (
+    <div className="deck-switch" role="tablist" aria-label="Home bar mode">
+      {TABS.map((t, i) => {
+        const on = i === active;
+        const Icon = t.icon;
+        return (
+          <Tooltip key={t.key} label={`${t.label} — ${t.hint}${compact ? '' : ' · Ctrl + .'}`} openDelay={400}>
+            <button
+              type="button" role="tab" aria-selected={on} aria-label={t.label} className="deck-tab" data-active={on || undefined}
+              style={{ '--a': t.a, '--b': t.b, '--ink': t.ink }} onClick={() => onChange(t.key)}
+            >
+              {on && <motion.span layoutId="deck-tab-fill" className="deck-tab-fill" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />}
+              <span className={`deck-tab-icon${on && thinking && t.key === 'chat' ? ' is-thinking' : ''}`}>
+                <Icon size={14} stroke={2.4} />
+              </span>
+              {!compact && <span className="deck-tab-text">{t.label}</span>}
+              {t.key === 'chat' && thinking && <span className="deck-tab-dot" aria-label="Myth is thinking" />}
+              {t.key === 'planner' && plans > 0 && <span className="deck-tab-count" title={`${plans} plan${plans === 1 ? '' : 's'}`}>{plans}</span>}
+            </button>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function CaptureBar({ mode = 'chat', onMode, onExpand, onChatOpen }) {
   const [value, setValue] = useState('');
-  const [barMode, setBarMode] = useState('plan'); // 'plan' | 'chat'
   const [listening, setListening] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [lastResult, setLastResult] = useState(null);
-  const [open, setOpen] = useState(false); // inline conversation visible
-  const [showHistory, setShowHistory] = useState(false);
+  const [notice, setNotice] = useState(null); // the planner's one-line reply when nothing could be planned
+  const [open, setOpen] = useState(false); // the Myth AI box shows the conversation
   const recRef = useRef(null);
-  const scrollRef = useRef(null);
+  const files = useChatFiles();
 
-  const projects = useStore((s) => s.projects);
-  const proposeProject = useStore((s) => s.proposeProject);
-  const chat = useStore((s) => s.chat);
-  const chatHistory = useStore((s) => s.chatHistory);
   const pushChat = useStore((s) => s.pushChat);
   const updateChat = useStore((s) => s.updateChat);
   const startNewChat = useStore((s) => s.startNewChat);
-  const loadChatSession = useStore((s) => s.loadChatSession);
-  const deleteChatSession = useStore((s) => s.deleteChatSession);
-  const chatMode = barMode === 'chat';
-  // phones: smaller controls, shorter placeholder — the text field keeps its room
+  const sessions = useStore((s) => s.plannerSessions ?? []);
+  const focusId = useUI((s) => s.plannerFocusId);
+  const setFocus = useUI((s) => s.setPlannerFocus);
+  const focused = useMemo(() => sessions.find((s) => s.id === focusId) ?? null, [sessions, focusId]);
+
+  const chatMode = mode === 'chat';
+  const planMode = mode === 'planner';
+  const tab = TABS.find((t) => t.key === mode) ?? TABS[0];
+  // phones: smaller controls, shorter placeholders — the text field keeps its room
   const mobile = useMediaQuery('(max-width: 768px)');
 
   // let the shell know the conversation is taking over the page
-  useEffect(() => { onChatOpen?.(open); }, [open, onChatOpen]);
+  useEffect(() => { onChatOpen?.(open && chatMode); }, [open, chatMode, onChatOpen]);
 
-  // keep the newest message in view without ever scrolling the page itself
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [chat, thinking, open]);
-
-  // Chatbot always opens fresh — the previous talk moves into history (kept 3 days).
+  // Myth AI always opens fresh — the previous talk moves into history (kept 3 days)
   const switchMode = (next) => {
-    if (next === barMode) return;
-    setBarMode(next);
-    setShowHistory(false);
+    if (next === mode) return;
     if (next === 'chat') startNewChat();
-    else setOpen(false);
+    if (mode === 'chat') setOpen(false);
+    onMode?.(next);
   };
 
-  const ask = async (q) => {
+  const ask = async (q, attached = []) => {
     if (thinking) return;
     setOpen(true);
-    setShowHistory(false);
-    pushChat({ role: 'user', text: q });
+    pushChat({ role: 'user', text: q || `Here ${attached.length === 1 ? 'is a file' : 'are some files'}.`, files: attached });
     setThinking(true);
     let aiId = null; // created on the first streamed token
     const onToken = (textSoFar) => {
-      if (!aiId) aiId = pushChat({ role: 'ai', text: textSoFar });
-      else updateChat(aiId, { text: textSoFar });
+      if (!textSoFar) return;
+      if (aiId) updateChat(aiId, { text: textSoFar });
+      else aiId = pushChat({ role: 'ai', text: textSoFar });
     };
     try {
-      const answer = await askAssistant(q, useStore, onToken);
+      const answer = await askAssistant(q || 'I attached a file. Tell me what it is about in two lines and what you could do with it.', useStore, onToken, { files: attached });
       if (aiId) updateChat(aiId, { text: answer });
       else pushChat({ role: 'ai', text: answer });
     } catch (e) {
@@ -91,31 +138,44 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
     }
   };
 
+  // Planner tab: a follow-up refines the plan on screen; a new kind of plan
+  // (or "new plan") starts another session
+  const plan = (text) => {
+    const { mode: detected } = detectMode(text);
+    const wantsNew = /\b(?:new|another|fresh)\s+(?:plan|trip|session)\b/i.test(text);
+    const tripSentence = detected === 'trip' && /\bfrom\b[\s\S]*\bto\b|\btrip\s+to\b|\bweekend\s+in\b/i.test(text);
+    if (focused && !wantsNew && (!detected || (detected === focused.mode && !tripSentence))) {
+      const { reset } = conversePlanner(focused, text, useStore);
+      if (reset) setFocus(null);
+      return;
+    }
+    const { session, reply } = startPlannerSession(text, useStore);
+    if (session) { setFocus(session.id); return; }
+    setNotice(reply);
+    setTimeout(() => setNotice(null), 5000);
+  };
+
   const submit = (text) => {
-    const t = (text ?? value).trim();
-    if (!t || thinking) return;
-    setValue('');
+    let t = (text ?? value).trim();
+    if (thinking || files.busy) return;
 
-    // chatbot mode, or clear question phrasing → the assistant
-    if (chatMode || QUESTION.test(t)) { ask(t); return; }
-
-    // "I need to launch my portfolio website next month" → a proposed project
-    // (milestones + tasks) to review — never thirty silent tasks
-    const intent = detectProjectIntent(t);
-    if (intent) {
-      proposeProject(t, intent);
-      setLastResult({ count: 1, msgs: [`Drafted a project plan for "${intent.name}" — nothing is created until you confirm`] });
-      setTimeout(() => setLastResult(null), 5000);
+    const slash = t.match(SLASH);
+    if (slash) {
+      const next = slashMode(slash[1]);
+      switchMode(next);
+      t = t.replace(SLASH, '').trim();
+      setValue('');
+      if (!t) return;
+      if (next === 'planner') { plan(t); return; }
+      ask(t, files.take());
       return;
     }
 
-    // Plan mode: split the sentence and route every piece to its feature
-    const items = parseMulti(t, projects);
-    if (!items.length) { ask(t); return; } // nothing capturable — let the bot handle it
-
-    const msgs = items.map((parsed) => executeCapture(parsed, useStore));
-    setLastResult({ count: items.length, msgs });
-    setTimeout(() => setLastResult(null), items.length > 1 ? 6500 : 4200);
+    // files alone are a message too ("here is a file")
+    if (!t && !(chatMode && files.pending.length)) return;
+    setValue('');
+    if (planMode) { plan(t); return; }
+    ask(t, files.take());
   };
 
   const toggleVoice = () => {
@@ -148,227 +208,71 @@ export default function CaptureBar({ onExpand, onChatOpen }) {
     setListening(true);
   };
 
-  const sessionLabel = (h) => {
-    const firstUser = h.messages.find((m) => m.role === 'user');
-    return firstUser?.text ?? 'Conversation';
-  };
+  const placeholder = listening ? 'Listening… speak now'
+    : chatMode
+      ? (files.pending.length ? 'What should I do with it? e.g. "add this to learning"'
+        : mobile ? 'Ask Myth anything…' : 'Ask me anything, or tell me what to add where…')
+      : focused
+        ? (focused.mode === 'trip'
+          ? 'Change the plan… ("budget 40k", "make it 3 people", "start trip")'
+          : 'Change the plan… ("move it to March", "go live", "new plan")')
+        : mobile ? 'Plan a trip, event, exam, diet…' : 'Plan anything — "Chennai to Goa 20–24 Dec for 2", "GATE exam in Feb", "save 1 lakh by March"…';
 
   return (
-    <Box w="100%" className="capture-wrap">
-      <Box
-        className="glass-strong capture-bar"
-        p={mobile ? 6 : 10}
-        pl={mobile ? 8 : 14}
-        style={{ borderRadius: 999, display: 'flex', alignItems: 'center', gap: 10 }}
-      >
-        {/* Plan / Chatbot switch */}
-        <Group
-          gap={2} p={3}
-          style={{ borderRadius: 999, background: 'rgba(15,81,50,0.09)', flexShrink: 0 }}
-        >
-          <Tooltip label="Plan mode — I split what you type into tasks, calendar, plan, money…">
-            <ActionIcon
-              size={mobile ? 30 : 38} radius="xl"
-              variant={!chatMode ? 'gradient' : 'subtle'}
-              gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
-              color="forest"
-              onClick={() => switchMode('plan')}
-            >
-              <IconListCheck size={18} color={!chatMode ? '#fff' : '#0D2D1C'} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Chatbot mode — talk to Myth AI (opens a fresh chat)">
-            <ActionIcon
-              size={mobile ? 30 : 38} radius="xl"
-              variant={chatMode ? 'gradient' : 'subtle'}
-              gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
-              color="forest"
-              onClick={() => switchMode('chat')}
-            >
-              <MythBot size={mobile ? 28 : 36} active={chatMode} mood={thinking ? 'thinking' : 'idle'} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+    <div className={`deck${planMode ? ' is-wide' : ''}`} style={{ '--a': tab.a, '--b': tab.b }}>
+      <div className="deck-bar">
+        <DeckTabs value={mode} onChange={switchMode} compact={mobile} thinking={thinking} plans={sessions.length} />
         <TextInput
           className="capture-input"
           variant="unstyled"
           size={mobile ? 'md' : 'lg'}
-          style={{ flex: 1 }}
-          placeholder={
-            listening ? 'Listening… speak now'
-              : chatMode ? 'Ask me anything, Boss…'
-                : mobile ? 'Plan anything…' : 'Plan anything — tasks, meetings, money, habits…'
-          }
+          placeholder={placeholder}
           value={value}
           onChange={(e) => setValue(e.currentTarget.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
+          onPaste={(e) => {
+            if (!chatMode) return;
+            const pasted = Array.from(e.clipboardData?.items ?? []).filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
+            if (pasted.length) { e.preventDefault(); files.ingest(pasted); }
+          }}
         />
-        <Tooltip label={listening ? 'Stop listening' : chatMode ? 'Speak — ask Myth' : 'Speak — I will plan it'}>
+        {chatMode && <AttachButton onFiles={files.ingest} size={mobile ? 34 : 40} />}
+        <Tooltip label={listening ? 'Stop listening' : chatMode ? 'Speak — ask Myth, or tell it what to add' : 'Speak — describe the plan'}>
           <ActionIcon
-            size={mobile ? 40 : 52}
-            radius="xl"
-            variant={listening ? 'filled' : 'light'}
-            color={listening ? 'red' : 'forest'}
-            className={listening ? 'pulse-soft' : ''}
-            onClick={toggleVoice}
+            size={mobile ? 40 : 50} radius="xl"
+            variant={listening ? 'filled' : 'light'} color={listening ? 'red' : 'forest'}
+            className={listening ? 'pulse-soft' : ''} onClick={toggleVoice} aria-label="Speak"
           >
             {listening ? <IconMicrophoneFilled size={20} /> : <IconMicrophone size={20} />}
           </ActionIcon>
         </Tooltip>
         <ActionIcon
-          size={mobile ? 40 : 52} radius="xl" variant="gradient" gradient={{ from: '#0D2D1C', to: '#1b5a38' }}
-          loading={thinking} onClick={() => submit()}
+          size={mobile ? 40 : 50} radius="xl" variant="gradient" gradient={{ from: tab.a, to: tab.b }}
+          loading={thinking || files.busy} onClick={() => submit()} aria-label={planMode ? 'Plan it' : 'Send'}
         >
-          <IconSend size={19} />
+          {planMode ? <IconCompass size={20} color={tab.ink} /> : <IconSend size={19} />}
         </ActionIcon>
-      </Box>
+      </div>
 
-      {/* inline conversation with Myth */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Box className="glass" mt={10} p={12} style={{ borderRadius: 20 }}>
-              <Group justify="space-between" mb={8}>
-                <Group gap={6}>
-                  <MythBot size={22} active mood={thinking ? 'thinking' : 'idle'} />
-                  <Text fz={12} fw={700} c="#0f5132">Myth AI</Text>
-                </Group>
-                <Group gap={2}>
-                  <Tooltip label="New chat (current one is kept in history for 3 days)">
-                    <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => { startNewChat(); setShowHistory(false); }}>
-                      <IconPlus size={13} />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="History — old chats auto-delete after 3 days">
-                    <ActionIcon
-                      size="sm" variant={showHistory ? 'light' : 'subtle'} color={showHistory ? 'forest' : 'gray'}
-                      onClick={() => setShowHistory((v) => !v)}
-                    >
-                      <IconHistory size={13} />
-                    </ActionIcon>
-                  </Tooltip>
-                  {onExpand && (
-                    <Tooltip label="Open full chat">
-                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={onExpand}><IconArrowsDiagonal size={13} /></ActionIcon>
-                    </Tooltip>
-                  )}
-                  <Tooltip label="Close">
-                    <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setOpen(false)}><IconX size={13} /></ActionIcon>
-                  </Tooltip>
-                </Group>
-              </Group>
-
-              {showHistory ? (
-                <Box className="scroll-y" style={{ maxHeight: 210 }}>
-                  {chatHistory.length === 0 ? (
-                    <Text fz={12.5} c="dimmed" ta="center" py={16}>
-                      No past chats — history keeps conversations for 3 days, then clears itself.
-                    </Text>
-                  ) : (
-                    <Stack gap={6}>
-                      {chatHistory.map((h) => (
-                        <Group
-                          key={h.id} gap={8} wrap="nowrap" py={7} px={10}
-                          style={{ borderRadius: 12, background: 'rgba(255,255,255,0.72)', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.6)' }}
-                          onClick={() => { loadChatSession(h.id); setShowHistory(false); }}
-                        >
-                          <IconHistory size={13} color="#1b5a38" style={{ flexShrink: 0 }} />
-                          <Box style={{ flex: 1, minWidth: 0 }}>
-                            <Text fz={12.5} fw={600} c="#16281f" truncate>{sessionLabel(h)}</Text>
-                            <Text fz={10.5} c="dimmed">{dayjs(h.ts).format('ddd, MMM D · h:mm A')}</Text>
-                          </Box>
-                          <ActionIcon
-                            size="sm" variant="subtle" color="gray"
-                            onClick={(e) => { e.stopPropagation(); deleteChatSession(h.id); }}
-                          >
-                            <IconTrash size={12} />
-                          </ActionIcon>
-                        </Group>
-                      ))}
-                    </Stack>
-                  )}
-                </Box>
-              ) : (
-                <Box ref={scrollRef} className="scroll-y" style={{ maxHeight: 210 }}>
-                  <Stack gap={8}>
-                    {chat.length === 0 && !thinking && (
-                      <Text fz={12.5} c="dimmed" ta="center" py={12}>Fresh chat — ask me anything, Boss.</Text>
-                    )}
-                    {chat.slice(-14).map((m) => (
-                      <Box
-                        key={m.id}
-                        py={8} px={12} maw="88%"
-                        style={{
-                          borderRadius: 14,
-                          marginLeft: m.role === 'user' ? 'auto' : 0,
-                          background: m.role === 'user' ? 'linear-gradient(135deg,#0D2D1C,#1b5a38)' : 'rgba(255,255,255,0.82)',
-                          color: m.role === 'user' ? '#fff' : '#16281f',
-                          border: '1px solid rgba(255,255,255,0.6)',
-                        }}
-                      >
-                        <Text fz={13} lh={1.5} style={{ whiteSpace: 'pre-line' }}>{m.text}</Text>
-                      </Box>
-                    ))}
-                    {thinking && (
-                      <Group gap={7} pl={2}>
-                        <Loader size="xs" color="forest" type="dots" />
-                        <Text fz={12} c="dimmed">Myth is thinking…</Text>
-                      </Group>
-                    )}
-                  </Stack>
-                </Box>
-              )}
-            </Box>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {lastResult && !open && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}
-          >
-            <Box className="glass" px={18} py={10} style={{ borderRadius: 18, display: 'inline-block', maxWidth: '100%' }}>
-              {lastResult.count > 1 && (
-                <Text fz={12.5} fw={700} c="#0f5132" mb={4}>{lastResult.count} items captured</Text>
-              )}
-              {lastResult.msgs.map((m, i) => (
-                <Text key={i} fz={13.5} fw={600} c="#0f5132">✓ {m}</Text>
-              ))}
-            </Box>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {!lastResult && !open && (
-        chatMode ? (
-          <Group justify="center" gap={8} mt={10} px={4}>
-            {CHAT_HINTS.map((h) => (
-              <Chip
-                key={h}
-                size="xs"
-                variant="light"
-                checked={false}
-                onClick={() => submit(h)}
-                styles={{ label: { background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(12px)', color: '#0e2018', fontWeight: 600, border: '1px solid rgba(255,255,255,0.9)' } }}
-              >
-                {h}
-              </Chip>
-            ))}
-          </Group>
-        ) : (
-          /* plan mode: today's plan lives here, where the example chips used to be */
-          <DayPlan />
-        )
+      {chatMode && <FileTray pending={files.pending} onRemove={files.remove} />}
+      {/* today's plan sits right under the bar; the conversation appears only once something is asked */}
+      {chatMode && <div className="plan-card"><DayPlan /></div>}
+      {chatMode && open && (
+        <InlineChat thinking={thinking} onExpand={onExpand} onClose={() => setOpen(false)} onAsk={(q) => submit(q)} hints={CHAT_HINTS} />
       )}
-    </Box>
+
+      <AnimatePresence>
+        {planMode && notice && (
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
+            <Box className="glass" px={18} py={10} style={{ borderRadius: 18, display: 'inline-block', maxWidth: '100%' }}>
+              <Text fz={13.5} fw={600} c="#0f5132">{notice}</Text>
+            </Box>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Planner tab with nothing on screen yet: the composer and examples are the empty state */}
+      {planMode && !notice && !focused && <PlanComposer onStart={(s) => setFocus(s.id)} />}
+    </div>
   );
 }

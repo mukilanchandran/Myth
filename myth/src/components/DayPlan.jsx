@@ -1,8 +1,8 @@
-// "Today's Plan" — an inline strip that lives right under the capture bar,
-// where the example suggestion chips used to be.
-// Empty day: a single dashed "Set today's plan" pill (morning ritual).
-// With items: a summary pill (2/5 + add more) followed by one pill per item —
-// tap the ring to complete, tap the × to remove.
+// "Today's plan" — the morning ritual, as a strip of pills inside the Myth AI
+// box: a summary pill (done/total — tap it to add more) and one pill per item;
+// tap the ring to complete, the × to remove. An empty day shows one dashed
+// "Set today's plan" pill. Myth AI edits the same list from chat ("add X to
+// today's plan", "done with X"), and the Command Center's focus blocks land here too.
 import { useMemo, useState } from 'react';
 import { Group, Text, Modal, Textarea, Button, Chip, Stack } from '@mantine/core';
 import { IconPlus, IconCheck, IconX, IconTargetArrow } from '@tabler/icons-react';
@@ -12,50 +12,19 @@ import { useStore, today } from '../store/useStore';
 function PlanPill({ item, onToggle, onDelete }) {
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+      layout className={`plan-pill${item.done ? ' is-done' : ''}`}
+      initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
     >
-      <Group
-        gap={7} wrap="nowrap" px={10} py={5}
-        style={{
-          borderRadius: 999,
-          background: item.done ? 'rgba(10,26,18,0.45)' : 'rgba(10,26,18,0.72)',
-          backdropFilter: 'blur(12px)',
-          border: item.done ? '1px solid rgba(61,220,132,0.4)' : '1px solid rgba(255,255,255,0.2)',
-          transition: 'background 200ms ease, border 200ms ease',
-        }}
+      <motion.button
+        type="button" className="plan-ring" whileTap={{ scale: 0.8 }} aria-pressed={item.done}
+        onClick={() => onToggle(item.id)} title={item.done ? 'Mark as not done' : 'Mark completed'}
       >
-        <motion.button
-          whileTap={{ scale: 0.8 }}
-          onClick={() => onToggle(item.id)}
-          title={item.done ? 'Mark as not done' : 'Mark completed'}
-          style={{
-            width: 18, height: 18, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
-            border: item.done ? 'none' : '2px solid rgba(255,255,255,0.55)',
-            background: item.done ? 'linear-gradient(135deg,#3ddc84,#1b5a38)' : 'transparent',
-            display: 'grid', placeItems: 'center', padding: 0,
-          }}
-        >
-          {item.done && <IconCheck size={11} color="#fff" stroke={3} />}
-        </motion.button>
-        <Text
-          fz={12.5} fw={600} c="#fff"
-          td={item.done ? 'line-through' : undefined}
-          opacity={item.done ? 0.65 : 1}
-          style={{ maxWidth: 230, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-        >
-          {item.text}
-        </Text>
-        <button
-          onClick={() => onDelete(item.id)}
-          title="Remove from plan"
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: 0.5 }}
-        >
-          <IconX size={12} color="#fff" />
-        </button>
-      </Group>
+        {item.done && <IconCheck size={11} color="#fff" stroke={3} />}
+      </motion.button>
+      <span className="plan-pill-text">{item.text}</span>
+      <button type="button" className="plan-pill-x" onClick={() => onDelete(item.id)} title="Remove from plan" aria-label={`Remove ${item.text}`}>
+        <IconX size={12} />
+      </button>
     </motion.div>
   );
 }
@@ -94,48 +63,25 @@ export default function DayPlan() {
 
   return (
     <>
-      <Group justify="center" gap={8} mt={10} px={12} wrap="wrap" maw={920} mx="auto">
+      <div className="plan-strip" aria-label="Today's plan">
         {items.length === 0 ? (
-          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}>
-            <Group
-              gap={7} px={14} py={7} wrap="nowrap"
-              onClick={() => setComposing(true)}
-              style={{
-                cursor: 'pointer', borderRadius: 999,
-                border: '2px dashed rgba(15,31,23,0.35)',
-                background: '#fff',
-              }}
-            >
-              <IconPlus size={15} color="#0f1f17" />
-              <Text fz={13} fw={700} c="#0f1f17">
-                Set today's plan
-              </Text>
-            </Group>
-          </motion.div>
+          <>
+            <motion.button type="button" className="plan-set" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }} onClick={() => setComposing(true)}>
+              <IconPlus size={14} /> Set today's plan
+            </motion.button>
+            <span className="plan-strip-hint">The morning ritual — the few things that matter today.</span>
+          </>
         ) : (
           <>
             {/* summary pill — tap to add more lines */}
-            <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.95 }}>
-              <Group
-                gap={7} px={12} py={6} wrap="nowrap"
-                onClick={() => setComposing(true)}
-                title="Add more to today's plan"
-                style={{
-                  cursor: 'pointer', borderRadius: 999,
-                  background: allDone
-                    ? 'linear-gradient(135deg, rgba(13,45,28,0.9), rgba(15,118,110,0.9))'
-                    : 'rgba(10,26,18,0.85)',
-                  backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.22)',
-                }}
-              >
-                <IconTargetArrow size={14} color="#3ddc84" style={{ flexShrink: 0 }} />
-                <Text fz={12.5} fw={800} c="#fff">
-                  {allDone ? 'All done today!' : "Today's plan"} · {doneCount}/{items.length}
-                </Text>
-                <IconPlus size={13} color="rgba(255,255,255,0.85)" style={{ flexShrink: 0 }} />
-              </Group>
-            </motion.div>
-
+            <motion.button
+              type="button" layout className={`plan-sum${allDone ? ' is-all' : ''}`} whileTap={{ scale: 0.96 }}
+              onClick={() => setComposing(true)} title="Add more to today's plan"
+            >
+              <IconTargetArrow size={14} color="#3ddc84" />
+              <span>{allDone ? 'All done today!' : "Today's plan"} · {doneCount}/{items.length}</span>
+              <IconPlus size={13} style={{ opacity: 0.85 }} />
+            </motion.button>
             <AnimatePresence>
               {ordered.map((item) => (
                 <PlanPill key={item.id} item={item} onToggle={togglePlanItem} onDelete={deletePlanItem} />
@@ -143,7 +89,7 @@ export default function DayPlan() {
             </AnimatePresence>
           </>
         )}
-      </Group>
+      </div>
 
       {/* plan composer */}
       <Modal
@@ -151,7 +97,7 @@ export default function DayPlan() {
         title={
           <div>
             <Text fw={800} fz={18}>What are you doing today?</Text>
-            <Text fz={12.5} c="dimmed" mt={2}>One thing per line — they appear as pills under the capture bar.</Text>
+            <Text fz={12.5} c="dimmed" mt={2}>One thing per line — they appear as pills in the Myth AI box. You can also just tell Myth "add … to today's plan".</Text>
           </div>
         }
       >

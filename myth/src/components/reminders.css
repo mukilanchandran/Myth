@@ -1,0 +1,61 @@
+/* Reminders panel: the quick-add card, suggestion chips, the section lists and rows. */
+
+.rem-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.rem-preview-title { font-size: 12.5px; font-weight: 600; color: #16281f; }
+
+.rem-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rem-quick button {
+  cursor: pointer; padding: 5px 10px; border-radius: 999px; border: 1px solid #e6ece8; background: #f7f9f8; color: #0e2018;
+  font: 600 11.5px 'Figtree', sans-serif; transition: background 0.14s, border-color 0.14s;
+}
+.rem-quick button:hover { background: #eef2ef; border-color: rgba(13, 45, 28, 0.25); }
+
+.rem-suggest {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer;
+  padding: 8px 10px; border-radius: 12px; border: 1px dashed rgba(13, 45, 28, 0.25); background: #fbfcfb;
+  font-family: 'Figtree', sans-serif; transition: background 0.14s, border-color 0.14s;
+}
+.rem-suggest:hover { background: #f3f6f4; border-color: rgba(13, 45, 28, 0.5); }
+.rem-suggest b { display: block; font-size: 12.5px; color: #0e2018; }
+.rem-suggest small { display: block; font-size: 11px; color: #6f7f76; margin-top: 1px; }
+.rem-suggest .rem-suggest-add { margin-left: auto; flex-shrink: 0; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #0D2D1C; color: #fff; }
+
+.rem-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.rem-stat { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: #fff; box-shadow: var(--card-shadow, 0 8px 26px rgba(20, 45, 33, 0.08)); font-family: 'Figtree', sans-serif; }
+.rem-stat b { font-size: 15px; font-weight: 800; color: var(--c, #0D2D1C); }
+.rem-stat span { font-size: 11.5px; font-weight: 600; color: #6f7f76; }
+
+.rem-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rem-section-head b { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--c, #0D2D1C); }
+.rem-section-head span { font-size: 11px; font-weight: 700; color: #fff; background: var(--c, #0D2D1C); border-radius: 999px; padding: 1px 7px; }
+
+.rem-list { display: flex; flex-direction: column; gap: 6px; }
+.rem-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 12px; border-radius: 14px;
+  background: #fff; border: 1px solid rgba(13, 45, 28, 0.06); box-shadow: var(--card-shadow, 0 8px 26px rgba(20, 45, 33, 0.08));
+  transition: transform 0.14s, box-shadow 0.14s;
+}
+.rem-row:hover { transform: translateY(-1px); }
+.rem-row.is-overdue { border-color: rgba(224, 49, 49, 0.35); background: #fff7f7; }
+.rem-row.is-soon { border-color: rgba(240, 140, 0, 0.45); }
+.rem-row.is-done { opacity: 0.7; }
+.rem-check {
+  display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; cursor: pointer; padding: 0;
+  border-radius: 50%; border: 2px solid rgba(13, 45, 28, 0.35); background: transparent; color: transparent;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+.rem-check:hover, .rem-check.is-on { background: linear-gradient(135deg, #3ddc84, #1b5a38); border-color: transparent; color: #fff; }
+.rem-body { flex: 1; min-width: 0; }
+.rem-title { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #0e2018; line-height: 1.25; }
+.rem-title svg { flex-shrink: 0; color: #6f7f76; }
+.rem-row.is-done .rem-title { text-decoration: line-through; }
+.rem-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; font-size: 11.5px; font-weight: 600; color: #6f7f76; }
+.rem-when { color: var(--c, #0D2D1C); }
+.rem-cat { display: inline-flex; align-items: center; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: var(--c); background: color-mix(in srgb, var(--c) 12%, #fff); }
+.rem-note { color: #4f6058; font-weight: 500; }
+.rem-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .rem-row { padding: 8px 8px 8px 10px; }
+  .rem-title { font-size: 13px; }
+}

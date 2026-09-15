@@ -7,7 +7,7 @@ import {
   notifyStatus, enableNotifications, showSystemNotification, isStandalone,
   enableBackgroundPush, disableBackgroundPush, getPushSubscription,
 } from '../../notify';
-import { detectAI, streamChat, pickModel, OLLAMA_DEFAULT } from '../../ai/ollama';
+import { detectAI, streamChat, pickModel, DEFAULT_ENDPOINT } from '../../ai/llm';
 import { PROVIDERS, providerFor } from '../../ai/providers';
 import * as cloud from '../../cloud/netlify';
 import { autoSync } from '../../cloud/autoSync';
@@ -360,16 +360,70 @@ function CloudSection({ settings, setSettings }) {
   );
 }
 
+// The Planner's research brain: ChatGPT for destination research when a key
+// is pasted here, otherwise the same AI the chat uses.
+function PlannerBrainSection({ settings, setSettings }) {
+  const openai = PROVIDERS.find((p) => p.id === 'openai');
+  const [testing, setTesting] = useState(false);
+  const dedicated = !!settings.plannerAiKey;
+  const test = async () => {
+    setTesting(true);
+    try {
+      const reply = await streamChat({
+        endpoint: settings.plannerAiEndpoint || openai.endpoint, model: settings.plannerAiModel || openai.defaultModel, apiKey: settings.plannerAiKey,
+        messages: [{ role: 'user', content: 'In one short sentence: name one must-see place in Goa.' }],
+      });
+      notifications.show({ color: 'green', title: `${settings.plannerAiModel || openai.defaultModel} answers ✓`, message: reply.slice(0, 140) });
+    } catch (e) {
+      notifications.show({ color: 'red', title: 'Planner brain test failed', message: e.message });
+    } finally {
+      setTesting(false);
+    }
+  };
+  return (
+    <Box className="glass" p="md" style={{ borderRadius: 16 }}>
+      <Group justify="space-between" mb={4}>
+        <Text fw={700} fz={14}>Planner search brain — ChatGPT</Text>
+        <Badge variant="light" size="sm" color={dedicated ? 'green' : 'gray'}>{dedicated ? 'ChatGPT key set' : 'uses the AI brain above'}</Badge>
+      </Group>
+      <Text fz={12.5} c="dimmed" mb="sm">
+        Myth Planner researches a destination like a well-travelled friend — areas to stay, must-sees, hidden gems, food, stays across budgets,
+        every way to get there and several themed itineraries. Paste an OpenAI key to run that research on ChatGPT models (pay-as-you-go, from
+        platform.openai.com) even while everyday chat stays on a free provider. Leave it empty to use the AI brain above.
+      </Text>
+      <Stack gap="sm">
+        <Anchor href={openai.keyUrl} target="_blank" rel="noreferrer" fz={12.5} fw={600}>
+          <Group gap={4} component="span">Get an OpenAI API key <IconExternalLink size={13} /></Group>
+        </Anchor>
+        <Group grow>
+          <PasswordInput radius="md" label="OpenAI API key" placeholder="sk-…" defaultValue={settings.plannerAiKey} onBlur={(e) => setSettings({ plannerAiKey: e.currentTarget.value.trim() })} />
+          <Select
+            radius="md" label="ChatGPT model" allowDeselect={false} searchable
+            data={[...new Set([...(openai.fallbackModels ?? []), settings.plannerAiModel].filter(Boolean))]}
+            value={settings.plannerAiModel || openai.defaultModel}
+            onChange={(v) => v && setSettings({ plannerAiModel: v })}
+          />
+        </Group>
+        <TextInput radius="md" label="Endpoint (optional)" description="Leave empty for api.openai.com — or any OpenAI-compatible endpoint that should power the planner" placeholder={openai.endpoint} defaultValue={settings.plannerAiEndpoint} onBlur={(e) => setSettings({ plannerAiEndpoint: e.currentTarget.value.trim() })} />
+        <Group gap="xs">
+          <Button size="xs" radius="xl" variant="light" color="forest" leftSection={<IconSparkles size={14} />} loading={testing} disabled={!settings.plannerAiKey} onClick={test}>Test planner brain</Button>
+          {dedicated && <Button size="xs" radius="xl" variant="subtle" color="gray" onClick={() => setSettings({ plannerAiKey: '', plannerAiModel: '', plannerAiEndpoint: '' })}>Use the AI brain instead</Button>}
+        </Group>
+      </Stack>
+    </Box>
+  );
+}
+
 export default function SettingsPanel() {
   const { settings, setSettings } = useStore();
   const [ai, setAi] = useState({ checking: true, ok: false, models: [] });
   const [testing, setTesting] = useState(false);
 
   const isAuto = !settings.aiEndpoint;
-  const endpoint = settings.aiEndpoint || OLLAMA_DEFAULT;
+  const endpoint = settings.aiEndpoint || DEFAULT_ENDPOINT;
   const llm7 = PROVIDERS.find((p) => p.id === 'llm7');
   // In auto mode the badge/model list reflect whichever endpoint actually answered
-  // (local Ollama first, then keyless LLM7) — same chain resolveAI uses.
+  // (the default endpoint first, then keyless LLM7) — same chain resolveAI uses.
   const activeEndpoint = ai.endpoint || endpoint;
   const provider = providerFor(activeEndpoint);
   const providerId = isAuto ? 'auto' : (providerFor(endpoint)?.id ?? 'custom');
@@ -492,15 +546,15 @@ export default function SettingsPanel() {
           </Badge>
         </Group>
         <Text fz={12.5} c="dimmed" mb="sm">
-          Works out of the box: Myth auto-connects to a free AI — local Ollama when running (private),
-          otherwise the free LLM7 cloud (no key, no signup). Prefer Groq/OpenRouter/Gemini? Pick one and paste a free key.
+          Works out of the box: Myth auto-connects to the free LLM7 cloud (no key, no signup).
+          Prefer Groq/OpenRouter/Gemini? Pick one and paste a free key.
         </Text>
         <Stack gap="sm">
           <Select
             radius="md" label="Provider" allowDeselect={false}
             value={providerId}
             data={[
-              { value: 'auto', label: 'Auto — free, no setup (local Ollama → LLM7 cloud)' },
+              { value: 'auto', label: 'Auto — free, no setup (LLM7 cloud)' },
               ...PROVIDERS.map((p) => ({ value: p.id, label: p.label })),
               { value: 'custom', label: 'Custom endpoint (any OpenAI-compatible)' },
             ]}
@@ -508,7 +562,7 @@ export default function SettingsPanel() {
           />
           {isAuto ? (
             <Text fz={12} c="dimmed" mt={-6}>
-              Zero-setup mode. Note: with no local Ollama, questions go to the free LLM7 cloud service — pick a specific provider if you want to control where your data goes.
+              Zero-setup mode. Note: questions go to the free LLM7 cloud service — pick a specific provider if you want to control where your data goes.
             </Text>
           ) : provider?.note ? (
             <Text fz={12} c="dimmed" mt={-6}>{provider.note}</Text>
@@ -520,8 +574,8 @@ export default function SettingsPanel() {
           )}
           <TextInput
             key={providerId === 'custom' ? 'custom' : endpoint}
-            radius="md" label="Endpoint" placeholder={isAuto ? 'auto-detected' : OLLAMA_DEFAULT}
-            description={providerId === 'custom' ? 'Any OpenAI-compatible /v1 endpoint (LM Studio, llama.cpp, vLLM…)' : isAuto ? 'Auto: tries local Ollama, then free LLM7 cloud' : 'Set automatically by the provider above'}
+            radius="md" label="Endpoint" placeholder={isAuto ? 'auto-detected' : DEFAULT_ENDPOINT}
+            description={providerId === 'custom' ? 'Any OpenAI-compatible /v1 endpoint (LM Studio, llama.cpp, vLLM…)' : isAuto ? 'Auto: the free LLM7 cloud' : 'Set automatically by the provider above'}
             defaultValue={settings.aiEndpoint}
             onBlur={(e) => setSettings({ aiEndpoint: e.currentTarget.value.trim() })}
           />
@@ -534,14 +588,14 @@ export default function SettingsPanel() {
               />
             ) : (
               <TextInput
-                radius="md" label="Model" placeholder="llama3.2"
+                radius="md" label="Model" placeholder="model id"
                 defaultValue={settings.aiModel}
                 onBlur={(e) => setSettings({ aiModel: e.currentTarget.value.trim() })}
               />
             )}
             <PasswordInput
               radius="md" label={provider?.needsKey ? 'API key (free)' : 'API key (if required)'}
-              placeholder={provider?.needsKey ? 'paste your free key' : 'not needed for Ollama'}
+              placeholder={provider?.needsKey ? 'paste your free key' : 'not needed for this provider'}
               defaultValue={settings.aiKey}
               onBlur={(e) => setSettings({ aiKey: e.currentTarget.value.trim() })}
             />
@@ -556,6 +610,8 @@ export default function SettingsPanel() {
           </Group>
         </Stack>
       </Box>
+
+      <PlannerBrainSection settings={settings} setSettings={setSettings} />
 
       <CloudSection settings={settings} setSettings={setSettings} />
 

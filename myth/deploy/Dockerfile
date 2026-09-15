@@ -14,14 +14,12 @@ COPY . .
 # Vite inlines VITE_* at build time, so config is baked in here, not at runtime.
 ARG VITE_APP_NAME="Myth"
 ARG VITE_APP_PASSWORD="mukilx"
-ARG VITE_AI_ENDPOINT="http://localhost:11434/v1"
+ARG VITE_AI_ENDPOINT="https://api.llm7.io/v1"
 ARG VITE_AI_MODEL=""
-ARG VITE_AI_WARMUP="true"
 ENV VITE_APP_NAME=$VITE_APP_NAME \
     VITE_APP_PASSWORD=$VITE_APP_PASSWORD \
     VITE_AI_ENDPOINT=$VITE_AI_ENDPOINT \
-    VITE_AI_MODEL=$VITE_AI_MODEL \
-    VITE_AI_WARMUP=$VITE_AI_WARMUP
+    VITE_AI_MODEL=$VITE_AI_MODEL
 
 RUN npm run build
 

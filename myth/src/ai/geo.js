@@ -71,6 +71,8 @@ export function progressAlong(geometry, pos) {
 }
 
 export const mapsLink = (lat, lon) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+// For places we only know by name (the AI guide's suggestions): a maps search.
+export const mapsSearchLink = (name, near) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(near ? `${name}, ${near}` : name)}`;
 
 // ---------- geocoding ----------
 // Photon (OSM search) first: it ranks "Goa" as Goa, India, where Open-Meteo's
@@ -120,14 +122,35 @@ export async function reverseGeocode(lat, lon) {
 // ---------- routing ----------
 // profile: 'driving' | 'cycling'. Returns km, minutes and a simplified [ {lat,lon} ] polyline.
 export async function route(from, to, profile = 'driving') {
-  const j = await getJSON(`https://router.project-osrm.org/route/v1/${profile}/${from.lon},${from.lat};${to.lon},${to.lat}?overview=simplified&geometries=geojson`, { timeout: 20000 });
-  const r = j?.routes?.[0];
-  if (!r) return null;
-  return {
-    km: Math.round(r.distance / 1000),
-    minutes: Math.round(r.duration / 60),
-    geometry: r.geometry.coordinates.map(([lon, lat]) => ({ lat, lon })),
-  };
+  const all = await routeAlternatives(from, to, profile);
+  return all[0] ?? null;
+}
+
+// Every road OSRM knows between two points (up to three), fastest first. Each
+// carries the highways it follows so the planner can name it ("via NH48").
+export async function routeAlternatives(from, to, profile = 'driving') {
+  const j = await getJSON(`https://router.project-osrm.org/route/v1/${profile}/${from.lon},${from.lat};${to.lon},${to.lat}?overview=simplified&geometries=geojson&alternatives=3&steps=true`, { timeout: 25000 });
+  const routes = j?.routes ?? [];
+  const out = routes.map((r, i) => {
+    const names = [];
+    for (const leg of r.legs ?? []) {
+      for (const st of leg.steps ?? []) {
+        const ref = st.ref ?? st.name;
+        if (ref && st.distance > 15000 && !names.includes(ref)) names.push(ref);
+      }
+    }
+    const via = names.slice(0, 3).map((n) => n.split(';')[0]);
+    return {
+      id: `r${i}`,
+      km: Math.round(r.distance / 1000),
+      minutes: Math.round(r.duration / 60),
+      geometry: r.geometry.coordinates.map(([lon, lat]) => ({ lat, lon })),
+      via,
+      name: via.length ? `via ${via.join(' · ')}` : i === 0 ? 'Fastest' : `Alternative ${i}`,
+    };
+  });
+  // OSRM sometimes returns the same road twice with a tiny detour — keep genuinely different ones
+  return out.filter((r, i) => out.findIndex((x) => Math.abs(x.km - r.km) < 5 && Math.abs(x.minutes - r.minutes) < 8) === i);
 }
 
 // ---------- weather ----------

@@ -76,7 +76,7 @@ export default function FinancePanel() {
           <TextInput radius="xl" placeholder="Note" style={{ flex: 1, minWidth: 150 }} value={note} onChange={(e) => setNote(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
           <ActionIcon size={36} radius="xl" variant="filled" color="forest" onClick={add}><IconPlus size={18} /></ActionIcon>
         </Group>
-        <Text fz={11.5} c="dimmed" mt={6}>Tip: just type "spent 250 on lunch" in the landing capture bar — it lands here automatically.</Text>
+        <Text fz={11.5} c="dimmed" mt={6}>Tip: just tell Myth AI "spent 250 on lunch" — it lands here automatically.</Text>
       </Box>
 
       <Stack gap={0}>

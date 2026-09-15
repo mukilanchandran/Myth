@@ -1,10 +1,10 @@
 // The "spark" — a fresh one-liner for Boss on every open of the landing page.
-// When the local AI (Ollama) is reachable it writes a brand-new line each time,
+// When an AI model is reachable it writes a brand-new line each time,
 // picking a vibe from the day of week, time of day and last journal mood.
 // Offline, a large curated pool keeps it feeling new anyway.
 import dayjs from 'dayjs';
 import { resolveAI } from './assistant';
-import { streamChat } from './ollama';
+import { streamChat } from './llm';
 
 const MOTIVATION = [
   'Discipline beats motivation — motivation starts, discipline finishes. 🔥',

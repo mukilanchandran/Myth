@@ -1,16 +1,15 @@
-// LLM bridge — talks to any OpenAI-compatible API.
-// Works with free cloud providers (Groq, OpenRouter, Google Gemini — see providers.js)
-// and local runtimes (Ollama at http://localhost:11434/v1, LM Studio, llama.cpp, vLLM…).
+// LLM transport — talks to any OpenAI-compatible chat API: the free cloud
+// providers in providers.js, or a custom /v1 endpoint set in Settings → AI brain.
 
 import { AI_ENDPOINT } from '../config/env';
 
-export const OLLAMA_DEFAULT = AI_ENDPOINT;
+export const DEFAULT_ENDPOINT = AI_ENDPOINT;
 
 // Session cache so we don't probe on every keystroke.
 let detected = null; // { ok: boolean, models: string[], endpoint, key, at: number }
 
-/** Probe an endpoint and list its available models. Cloud providers need the API key here too. */
-export async function detectAI(endpoint = OLLAMA_DEFAULT, { force = false, apiKey = '' } = {}) {
+/** Probe an endpoint and list its available models. Providers that need an API key need it here too. */
+export async function detectAI(endpoint = DEFAULT_ENDPOINT, { force = false, apiKey = '' } = {}) {
   const key = apiKey || '';
   if (!force && detected && Date.now() - detected.at < 60_000 && detected.endpoint === endpoint && detected.key === key) {
     return detected;
@@ -32,8 +31,10 @@ export async function detectAI(endpoint = OLLAMA_DEFAULT, { force = false, apiKe
 }
 
 // Quality ranking for auto-selection — best general open models first.
-// Covers both local Ollama tags (llama3.1) and cloud ids (llama-3.3-70b-versatile).
 const MODEL_RANK = [
+  /gpt-5(?!-nano)/i,
+  /gpt-4\.1(?!-nano|-mini)/i,
+  /gpt-4o(?!-mini)/i,
   /nemotron-3-ultra/i,
   /llama[-.]?3\.3[-.]?70b/i,
   /gpt-oss-120b/i,
@@ -53,7 +54,7 @@ const MODEL_RANK = [
   /phi/i,
 ];
 
-/** Rank installed models by quality; chat models only. */
+/** Rank available models by quality; chat models only. */
 export function rankModels(models) {
   const chatty = models.filter((m) => !/embed|bge|nomic|minilm|code/i.test(m));
   return [...chatty].sort((a, b) => {
@@ -64,11 +65,11 @@ export function rankModels(models) {
 }
 
 /**
- * Pick the model to use. An explicit preference wins when installed;
- * otherwise the top-ranked installed model is chosen automatically.
+ * Pick the model to use. An explicit preference wins when available;
+ * otherwise the top-ranked available model is chosen automatically.
  */
 export function pickModel(preferred, models) {
-  if (!models.length) return preferred || 'llama3.1:8b';
+  if (!models.length) return preferred || '';
   if (preferred && models.some((m) => m === preferred || m.startsWith(preferred + ':'))) {
     return models.find((m) => m === preferred) ?? models.find((m) => m.startsWith(preferred + ':'));
   }
@@ -77,31 +78,11 @@ export function pickModel(preferred, models) {
 }
 
 /**
- * Load the model into RAM and pin it there for an hour (local Ollama only —
- * cloud providers are always warm, so this no-ops for them).
- * Without this the first question after 5 idle minutes pays a ~30s cold start,
- * because Ollama unloads the weights and has to re-read them from disk.
- */
-export async function warmUp(endpoint, model) {
-  const target = endpoint || OLLAMA_DEFAULT;
-  if (!/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(target)) return;
-  try {
-    const root = target.replace(/\/$/, '').replace(/\/v1$/, '');
-    await fetch(`${root}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt: '', keep_alive: '1h' }),
-      signal: AbortSignal.timeout(120_000),
-    });
-  } catch { /* warm-up is an optimisation, never a failure path */ }
-}
-
-/**
  * Streaming chat completion. Calls onToken(fullTextSoFar) as tokens arrive.
  * Returns the final text. Throws on network/HTTP errors.
  */
 export async function streamChat({ endpoint, model, apiKey, messages, onToken, temperature = 0.5 }) {
-  const base = (endpoint || OLLAMA_DEFAULT).replace(/\/$/, '');
+  const base = (endpoint || DEFAULT_ENDPOINT).replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },

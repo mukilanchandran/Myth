@@ -2,7 +2,8 @@
 // rule-based plan is always built first and these only improve wording or
 // re-order real places. They never invent places and never throw.
 import { resolveAI } from './assistant';
-import { streamChat } from './ollama';
+import { resolvePlannerAI } from './tripGuide';
+import { streamChat } from './llm';
 import { APP_NAME } from '../config/env';
 
 const withTimeout = (p, ms) => Promise.race([p, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
@@ -13,7 +14,7 @@ const jsonIn = (text) => { const m = text?.match(/\{[\s\S]*\}/); if (!m) return 
 // plain words like "Lunch" / "Check in" — anything else is dropped.
 export async function aiTripItineraries(ctx, result, state) {
   try {
-    const ai = await resolveAI(state);
+    const ai = await resolvePlannerAI(state);
     if (!ai.ok) return null;
     const names = new Set([...(ctx.pois.attractions ?? []), ...(ctx.pois.food ?? []), ...(ctx.pois.stays ?? [])].map((p) => p.name).filter(Boolean));
     const list = (arr, n) => arr.slice(0, n).map((p) => `${p.name} (${p.sub}${p.km != null ? `, ${p.km} km` : ''})`).join('; ');

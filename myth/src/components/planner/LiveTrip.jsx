@@ -1,7 +1,8 @@
 // Live mode: where you are, what the sky is doing, what's nearby (fuel, food,
 // stays, help) and what's next on the plan — refreshed as you move.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Stack, Group, Text, Button, Badge, Box, Tabs, TextInput, Checkbox, Anchor, Loader, ActionIcon, Tooltip } from '@mantine/core';
+import { Stack, Group, Text, Button, Badge, Box, Tabs, Checkbox, Anchor, Loader, ActionIcon, Tooltip } from '@mantine/core';
+import PlaceInput from '../PlaceInput';
 import { IconGasStation, IconBed, IconToolsKitchen2, IconFirstAidKit, IconCash, IconMapPin, IconRefresh, IconFlag, IconCheck, IconNavigation } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useStore } from '../../store/useStore';
@@ -115,7 +116,7 @@ export default function LiveTrip({ session }) {
           </Group>
         </Group>
         <Group gap={6} mt="xs" wrap="nowrap">
-          <TextInput size="xs" radius="xl" style={{ flex: 1 }} placeholder={geoError ? "No GPS — type where you are (e.g. 'Tindivanam')" : "Or type where you are…"} value={manual} onChange={(e) => setManual(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && setManualPlace()} />
+          <PlaceInput size="xs" radius="xl" style={{ flex: 1 }} placeholder={geoError ? "No GPS — type where you are (e.g. 'Tindivanam')" : "Or type where you are…"} value={manual} onChange={setManual} onKeyDown={(e) => e.key === 'Enter' && setManualPlace()} />
           <Button size="xs" radius="xl" variant="light" color="forest" onClick={setManualPlace}>Set</Button>
           <Button size="xs" radius="xl" variant="light" color="blue" leftSection={<IconFlag size={13} />} onClick={checkIn} disabled={!pos}>Check in</Button>
         </Group>

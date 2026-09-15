@@ -60,28 +60,20 @@ export const PROVIDERS = [
     fallbackModels: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
   },
   {
-    id: 'ollama',
-    label: 'Ollama — local on this device',
-    endpoint: 'http://localhost:11434/v1',
-    keyUrl: null,
-    needsKey: false,
-    defaultModel: '',
-    note: 'Fully private and offline, but only reachable on the machine where Ollama runs — it cannot power a deployed app for other devices.',
-    mapModels: (models) => models,
-    fallbackModels: [],
+    id: 'openai',
+    label: 'OpenAI — ChatGPT models (paid key)',
+    endpoint: 'https://api.openai.com/v1',
+    keyUrl: 'https://platform.openai.com/api-keys',
+    needsKey: true,
+    defaultModel: 'gpt-4o-mini',
+    note: 'The ChatGPT models. Pay-as-you-go key from platform.openai.com — the strongest option for the Planner\'s destination research.',
+    mapModels: (models) => models.filter((m) => /^(gpt-4o|gpt-4\.1|gpt-5|o[1-9])/i.test(m) && !/audio|realtime|transcribe|tts|search|image|embedding|moderation|instruct|preview|codex/i.test(m)),
+    fallbackModels: ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4.1'],
   },
 ];
 
 /** Find the preset matching an endpoint; null → custom/unknown endpoint. */
 export function providerFor(endpoint) {
   const e = (endpoint || AI_ENDPOINT).replace(/\/$/, '');
-  return (
-    PROVIDERS.find((p) => e === p.endpoint || e.startsWith(p.endpoint)) ??
-    (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(e) ? PROVIDERS.find((p) => p.id === 'ollama') : null)
-  );
-}
-
-/** True when the endpoint is on this machine (local Ollama / LM Studio…). */
-export function isLocalEndpoint(endpoint) {
-  return /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(endpoint || AI_ENDPOINT);
+  return PROVIDERS.find((p) => e === p.endpoint || e.startsWith(p.endpoint)) ?? null;
 }

@@ -76,7 +76,7 @@ export default function ReportsPanel() {
         setAiText(null);
         notifications.show({
           color: 'orange', title: 'AI model not reachable',
-          message: 'Start Ollama on this device (Settings → AI brain) and try again.',
+          message: 'Check the AI provider in Settings → AI brain and try again.',
         });
       } else {
         setAiText(result.text);

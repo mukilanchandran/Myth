@@ -1,31 +1,28 @@
-import { Stack, Group, Text, Box, Checkbox, Badge, Progress, Divider, Button } from '@mantine/core';
-import { IconCalendarEvent, IconAlertCircle, IconClockHour4, IconProgress, IconTargetArrow, IconBrain } from '@tabler/icons-react';
+import { Stack, Group, Text, Box, Checkbox, Badge, Progress, Divider } from '@mantine/core';
+import { IconCalendarEvent, IconAlertCircle, IconClockHour4, IconProgress, IconTargetArrow } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useStore } from '../../store/useStore';
 import { localAnswer } from '../../ai/assistant';
-import { contextFor } from '../../ai/context';
-import { useUI } from '../../store/useUI';
 
 export default function TodayPanel() {
   const state = useStore();
   const todayKey = dayjs().format('YYYY-MM-DD');
-  const openContext = useUI((s) => s.openContext);
 
   const open = state.tasks.filter((t) => t.status !== 'done');
   const overdue = open.filter((t) => t.due && dayjs(t.due).isBefore(dayjs(), 'day'));
   const dueToday = open.filter((t) => t.due === todayKey);
   const doing = open.filter((t) => t.status === 'doing' && !dueToday.includes(t) && !overdue.includes(t));
+  // meetings are calendar entries; a meeting note written by hand shows up too, once
   const meetingsToday = state.notes.filter((n) => n.type === 'meeting' && n.meeting?.date === todayKey);
   const eventsToday = state.events
     .filter((e) => e.date === todayKey || (e.yearly && dayjs(e.date).format('MM-DD') === dayjs().format('MM-DD')))
-    // a meeting captured from the bar exists as both a note and an event — show it once
     .filter((e) => !(e.kind === 'meeting' && meetingsToday.some((m) => m.title.trim().toLowerCase() === e.title.trim().toLowerCase())));
 
   const doneToday = state.tasks.filter((t) => t.completedAt && dayjs(t.completedAt).isSame(dayjs(), 'day'));
   const habitsDone = state.habits.filter((h) => h.log[todayKey]).length;
   const dayPlan = (state.plans ?? {})[todayKey] ?? [];
   const planDone = dayPlan.filter((p) => p.done).length;
-  const score = Math.min(100, doneToday.length * 20 + habitsDone * 10 + planDone * 10 + (meetingsToday.length ? 10 : 0));
+  const score = Math.min(100, doneToday.length * 20 + habitsDone * 10 + planDone * 10 + (meetingsToday.length || eventsToday.some((e) => e.kind === 'meeting') ? 10 : 0));
 
   const plan = localAnswer('what are my priorities today', state);
 
@@ -64,17 +61,10 @@ export default function TodayPanel() {
       )}
 
       {section('Meetings & events today', IconCalendarEvent, '#7048e8', [
-        ...meetingsToday.map((m) => ({ ...m, _t: m.meeting?.time, _cid: `note:${m.id}` })),
-        ...eventsToday.map((e) => ({ ...e, _t: e.time, _cid: e.kind === 'meeting' ? `event:${e.id}` : null })),
+        ...meetingsToday.map((m) => ({ ...m, _t: m.meeting?.time, _where: m.meeting?.location, _who: m.meeting?.participants })),
+        ...eventsToday.map((e) => ({ ...e, _t: e.time, _where: e.location, _who: e.participants })),
       ], (m) => {
-        // the Context Engine explains each meeting through everything linked to it
-        const ctx = m._cid ? contextFor(state, m._cid) : null;
-        const c = ctx?.counts;
-        const bits = c ? [
-          c.openTasks && `${c.openTasks} open task${c.openTasks === 1 ? '' : 's'}`,
-          c.documents && `${c.documents} doc${c.documents === 1 ? '' : 's'}`,
-          c.unresolvedActions && `${c.unresolvedActions} unresolved`,
-        ].filter(Boolean) : [];
+        const bits = [m._where, m._who ? `with ${m._who}` : null].filter(Boolean);
         return (
           <Group key={m.id} className="glass" p={10} style={{ borderRadius: 12 }} gap={8} wrap="nowrap">
             <Badge variant="light" color="violet" size="sm">{m._t || 'all day'}</Badge>
@@ -82,11 +72,6 @@ export default function TodayPanel() {
               <Text fz={13.5} fw={600} lineClamp={1}>{m.title}</Text>
               {bits.length > 0 && <Text fz={11.5} c="dimmed">{bits.join(' · ')}</Text>}
             </Box>
-            {ctx && (
-              <Button size="compact-xs" radius="xl" variant="light" color="violet" leftSection={<IconBrain size={12} />} onClick={() => openContext(m._cid)}>
-                Prep
-              </Button>
-            )}
           </Group>
         );
       })}

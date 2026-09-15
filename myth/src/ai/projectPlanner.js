@@ -253,6 +253,37 @@ export const TEMPLATES = {
       { title: 'Taper & event', weight: 1, tasks: ['Reduce volume in the final week', 'Do the event', 'Recover and write down what you learned'] },
     ],
   },
+  food: {
+    label: 'Food & diet', horizonWeeks: 4,
+    milestones: [
+      { title: 'Targets & kitchen', weight: 1, tasks: ['Write the goal for {name} and the daily calorie / protein target', 'Clear the pantry of the foods that work against it', 'Pick 8-10 go-to meals you actually like', 'Buy containers and basics for meal prep'] },
+      { title: 'Week 1 — the routine', weight: 1.5, tasks: ['Cook or prep breakfasts for the week', 'Shop once from the grocery list', 'Log every meal for 7 days', 'Fix one meal that keeps going wrong'] },
+      { title: 'Week 2 — variety', weight: 1.5, tasks: ['Add 3 new recipes to the rotation', 'Plan eating-out choices in advance', 'Weekly check-in: weight, energy, sleep', 'Adjust portions to the numbers'] },
+      { title: 'Week 3 — make it automatic', weight: 1.5, tasks: ['Batch-cook Sunday: lunches for 4 days', 'Set a snack rule and a water target', 'Cut one thing that still sneaks in', 'Second check-in'] },
+      { title: 'Review', weight: 0.5, tasks: ['Compare week 4 with week 1', 'Write down what to keep for good', 'Set the next 4-week target'] },
+    ],
+  },
+  finance: {
+    label: 'Money goal', horizonWeeks: 12,
+    milestones: [
+      { title: 'Know the numbers', weight: 1, tasks: ['Write the target and date for {name}', 'List monthly income and every fixed expense', 'Find the last 3 months of spending by category', 'Decide the monthly amount to set aside'] },
+      { title: 'Set up the machine', weight: 1, tasks: ['Open or pick the account / fund where the money goes', 'Automate the transfer on salary day', 'Cancel or downgrade 2 subscriptions', 'Set a weekly spending limit for the leaky categories'] },
+      { title: 'Month 1', weight: 2, tasks: ['Hit the month-1 transfer', 'Track spending weekly against the limit', 'Sell or return something unused', 'Month-end review: on track or adjust'] },
+      { title: 'Month 2', weight: 2, tasks: ['Hit the month-2 transfer', 'Add one income boost: freelance, bonus, refund', 'Renegotiate one bill (internet, insurance, rent)', 'Month-end review'] },
+      { title: 'Month 3 & beyond', weight: 2, tasks: ['Hit the month-3 transfer', 'Move surplus into the goal', 'Protect the goal: no dipping rule', 'Month-end review'] },
+      { title: 'Goal day', weight: 0.5, tasks: ['Confirm the balance reached the target', 'Decide what the money does next', 'Celebrate {name} — without spending it'] },
+    ],
+  },
+  routine: {
+    label: 'Routine', horizonWeeks: 4,
+    milestones: [
+      { title: 'Design it', weight: 1, tasks: ['Write the ideal day for {name}: wake, work, move, wind down', 'Pick the 3 anchors that matter most', 'Decide the wake and sleep times', 'Prepare the night before: clothes, desk, alarm'] },
+      { title: 'Week 1 — anchors only', weight: 1.5, tasks: ['Do the 3 anchors every day', 'Track each day: done / missed / why', 'Protect the first hour from the phone', 'Friday review: what fought back'] },
+      { title: 'Week 2 — add the rest', weight: 1.5, tasks: ['Add the full schedule on weekdays', 'Set one weekend rhythm', 'Fix the block that keeps slipping', 'Friday review'] },
+      { title: 'Week 3 — make it stick', weight: 1.5, tasks: ['Pair each block with a cue (coffee → planning)', 'Plan for the bad day: the minimum version', 'Tell someone the routine', 'Friday review'] },
+      { title: 'Review', weight: 0.5, tasks: ['Compare week 4 with week 1', 'Keep what works, drop the rest', 'Write the routine as it really is now'] },
+    ],
+  },
   generic: {
     label: 'Project', horizonWeeks: 6,
     milestones: [
