@@ -29,6 +29,18 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# The home backdrop (video + poster): not fingerprinted, so a week rather than forever.
+# Repeat visits play it straight from the browser cache.
+[[headers]]
+  for = "/*.webm"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/home-poster.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
 [[headers]]
   for = "/index.html"
   [headers.values]

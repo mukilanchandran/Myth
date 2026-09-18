@@ -17,18 +17,22 @@ import { buildPlan, createProjectFromPlan, detectProjectIntent, titleCase } from
 import { startPlannerSession } from './plannerSession.js';
 import { makeDocument, normalizeFormat, FORMATS } from './docgen.js';
 import { parseReminder, describeWhen, reminderRundown, REPEATS, activeReminders } from './reminders.js';
+import { parseWorkLog, parseDuration, guessWorkCategory, workRundown, projectName, fmtMinutes, toStatus, statusOf, WORK_CATEGORIES, WORK_STATUSES } from './worklog.js';
 
 const stateOf = (store) => (store.getState ? store.getState() : store);
 const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const clean = (v, n = 200) => (v == null ? '' : String(v).replace(/\s+/g, ' ').trim().slice(0, n));
 
 // "tomorrow", "next friday", "2026-10-02" → YYYY-MM-DD (or null)
-export function toDate(v, now = new Date()) {
+// `forward: false` is for things that already happened (work logs): "monday" means the last one
+export function toDate(v, now = new Date(), forward = true) {
   const s = clean(v, 60);
   if (!s) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const d = chrono.parseDate(s, now, { forwardDate: true });
-  return d ? dayjs(d).format('YYYY-MM-DD') : null;
+  const d = chrono.parseDate(s, now, { forwardDate: forward });
+  if (!d) return null;
+  const day = !forward && dayjs(d).isAfter(dayjs(now), 'day') ? dayjs(d).subtract(7, 'day') : dayjs(d);
+  return day.format('YYYY-MM-DD');
 }
 const toTime = (v) => { const m = clean(v, 20).match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i); if (!m) return null; let h = +m[1]; if (m[3]) { if (/pm/i.test(m[3]) && h < 12) h += 12; if (/am/i.test(m[3]) && h === 12) h = 0; } return `${String(h).padStart(2, '0')}:${m[2] ?? '00'}`; };
 
@@ -73,10 +77,6 @@ async function placeFile(ctx, file, { to, learning, project, title }) {
     s.updateFileMeta(file.id, { projectId: p.id });
     return `"${file.name}" filed under project "${p.name}"`;
   }
-  if (/^note/.test(target)) {
-    s.addNote({ title: clean(title || file.name, 80), body: file.text ? clean(file.text, 4000) : `Attached: ${file.name}`, type: 'note' });
-    return `A note "${clean(title || file.name, 80)}" saved with the file's text`;
-  }
   const blob = ctx.getBlob ? await ctx.getBlob(file.id) : null;
   s.addDriveItem({ kind: /^image\//.test(file.type ?? '') ? 'image' : 'file', title: clean(title || file.name.replace(/\.[a-z0-9]+$/i, ''), 80), name: file.name, size: file.size, type: file.type, blobId: blob ? await (async () => { const id = newId(); await ctx.putBlob?.(id, blob); return id; })() : file.id });
   return `"${file.name}" saved to Drive`;
@@ -99,13 +99,6 @@ export const ACTIONS = {
     s.completeTask(t.id);
     return `"${t.title}" marked done`;
   } },
-  add_note: { desc: 'add_note {title, body?, project?}', run: (a, ctx) => {
-    const s = stateOf(ctx.store);
-    const p = a.project ? findByName(s.projects, a.project) : null;
-    s.addNote({ title: clean(a.title, 120), body: clean(a.body, 8000), type: 'note', projectId: p?.id ?? null });
-    return `Note "${clean(a.title, 120)}" saved${p ? ` in ${p.name}` : ''}`;
-  } },
-  add_idea: { desc: 'add_idea {title, body?}', run: (a, ctx) => { stateOf(ctx.store).addNote({ title: clean(a.title, 120), body: clean(a.body, 8000), type: 'idea' }); return `Idea "${clean(a.title, 120)}" saved`; } },
   add_meeting: { desc: 'add_meeting {title, date, time?, participants?, location?} — a calendar entry', run: (a, ctx) => {
     const s = stateOf(ctx.store);
     const date = toDate(a.date) ?? dayjs().format('YYYY-MM-DD');
@@ -151,6 +144,69 @@ export const ACTIONS = {
     return `Reminder "${r.title}" deleted`;
   } },
   list_reminders: { desc: 'list_reminders {} — overdue, today, tomorrow and this week', run: (a, ctx) => reminderRundown(stateOf(ctx.store)) },
+  log_work: { desc: 'log_work {title, description?, project?, status?(done|in progress|in review|blocked; default done), date?, duration?("2h", "45 min" — only when the user says how long)} — Track: one thing that was worked on', run: (a, ctx) => {
+    const s = stateOf(ctx.store);
+    const title = clean(a.title ?? a.text, 140);
+    if (!title) return 'A work log needs a title';
+    const parsed = parseWorkLog(`${title} ${clean(a.duration, 40)}`.trim(), s.projects ?? []);
+    const known = a.project ? findByName(s.projects ?? [], a.project) : null;
+    const date = toDate(a.date, new Date(), false) ?? parsed?.date ?? dayjs().format('YYYY-MM-DD');
+    const minutes = Number(a.minutes) > 0 ? Math.round(Number(a.minutes)) : parseDuration(clean(a.duration, 40))?.minutes ?? parsed?.minutes ?? null;
+    const entry = s.addWorkLog({
+      title: parsed?.title || title, note: clean(a.description ?? a.note, 600), date, minutes,
+      status: toStatus(a.status) ?? parsed?.status ?? 'done',
+      start: toTime(a.start) ?? parsed?.start ?? null, end: toTime(a.end) ?? parsed?.end ?? null,
+      projectId: known?.id ?? parsed?.projectId ?? null, project: known?.name ?? (clean(a.project, 60) || parsed?.project || ''),
+      category: WORK_CATEGORIES[clean(a.category, 20).toLowerCase()] ? clean(a.category, 20).toLowerCase() : parsed?.category ?? guessWorkCategory(title), source: 'ai',
+    });
+    const p = projectName(entry, s.projects ?? []);
+    return `Logged "${entry.title}"${p ? ` · ${p}` : ''} · ${WORK_STATUSES[statusOf(entry)].label}${entry.minutes > 0 ? ` · ${fmtMinutes(entry.minutes)}` : ''} · ${dayjs(entry.date).isSame(dayjs(), 'day') ? 'today' : dayjs(entry.date).format('ddd, MMM D')}${entry.start && entry.end ? ` ${entry.start}–${entry.end}` : ''}`;
+  } },
+  start_timer: { desc: 'start_timer {title, project?} — Track: start the live work timer', run: (a, ctx) => {
+    const s = stateOf(ctx.store);
+    const title = clean(a.title ?? a.text, 140);
+    if (!title) return 'The timer needs to know what you are working on';
+    const known = a.project ? findByName(s.projects ?? [], a.project) : (s.projects ?? []).find((p) => p.name && title.toLowerCase().includes(p.name.toLowerCase())) ?? null;
+    s.startWorkTimer({ title, projectId: known?.id ?? null, project: known?.name ?? clean(a.project, 60), category: guessWorkCategory(title) });
+    return `Timer started — "${title}"${known ? ` · ${known.name}` : ''}. Say "stop timer" when you are done`;
+  } },
+  stop_timer: { desc: 'stop_timer {} — Track: stop the running timer and file it as a work log', run: (a, ctx) => {
+    const s = stateOf(ctx.store);
+    if (!s.worklogTimer) return 'No timer is running';
+    const title = s.worklogTimer.title;
+    const entry = s.stopWorkTimer();
+    return entry ? `Timer stopped — "${entry.title}" logged, ${fmtMinutes(entry.minutes)} (${entry.start}–${entry.end})` : `Timer stopped — "${title}" ran under a minute, nothing logged`;
+  } },
+  work_summary: { desc: 'work_summary {range?: today|yesterday|this week|last week|this month|YYYY-MM-DD} — Track: what was worked on, with status', run: (a, ctx) => workRundown(stateOf(ctx.store), clean(a.range ?? a.date, 40) || 'today') },
+  save_work_summary: { desc: 'save_work_summary {text, date?} — Track: save the written daily summary for a day', run: (a, ctx) => {
+    const text = String(a.text ?? '').trim().slice(0, 2000);
+    if (!text) return 'The summary needs text';
+    const date = toDate(a.date, new Date(), false) ?? dayjs().format('YYYY-MM-DD');
+    stateOf(ctx.store).setWorkSummary(date, text, 'ai');
+    return `Daily summary saved for ${dayjs(date).format('ddd, MMM D')}`;
+  } },
+  update_work: { desc: 'update_work {title, status?(done|in progress|in review|blocked), description?, project?, date?} — Track: change a logged item (e.g. mark it done)', run: (a, ctx) => {
+    const s = stateOf(ctx.store);
+    const date = toDate(a.date, new Date(), false);
+    const w = findByName((s.worklog ?? []).filter((x) => !date || x.date === date), a.title, 'title');
+    if (!w) return `No work log matches "${clean(a.title)}"`;
+    const patch = {};
+    const status = toStatus(a.status);
+    if (status) patch.status = status;
+    if (a.description != null) patch.note = clean(a.description, 600);
+    if (a.project) { const known = findByName(s.projects ?? [], a.project); patch.projectId = known?.id ?? null; patch.project = known?.name ?? clean(a.project, 60); }
+    if (!Object.keys(patch).length) return 'Nothing to change — give a status, a description or a project';
+    s.updateWorkLog(w.id, patch);
+    return `"${w.title}" updated${status ? ` — ${WORK_STATUSES[status].label}` : ''}`;
+  } },
+  delete_work: { desc: 'delete_work {title, date?} — Track: remove a work log entry', run: (a, ctx) => {
+    const s = stateOf(ctx.store);
+    const date = toDate(a.date, new Date(), false);
+    const w = findByName((s.worklog ?? []).filter((x) => !date || x.date === date), a.title, 'title');
+    if (!w) return `No work log matches "${clean(a.title)}"`;
+    s.deleteWorkLog(w.id);
+    return `Work log "${w.title}" deleted`;
+  } },
   add_learning: { desc: 'add_learning {title, notes?, file?("last" or id), url?}', run: (a, ctx) => {
     const s = stateOf(ctx.store);
     const title = clean(a.title, 100);
@@ -206,7 +262,7 @@ export const ACTIONS = {
     ctx.onFile?.(meta);
     return `${FORMATS[format].label} "${name}" created and saved to ${where}`;
   } },
-  attach_file: { desc: 'attach_file {file: "last"|id, to: learning|project|drive|note, learning?, project?, title?}', run: async (a, ctx) => {
+  attach_file: { desc: 'attach_file {file: "last"|id, to: learning|project|drive, learning?, project?, title?}', run: async (a, ctx) => {
     const f = pickFile(a.file, ctx);
     if (!f) return 'No file in this chat to attach — use the paperclip to add one';
     return placeFile(ctx, f, a);
@@ -233,9 +289,9 @@ export const ACTIONS = {
     ctx.ui?.setPanel?.(null);
     return `Planner opened — ${reply}`;
   } },
-  open: { desc: 'open {panel: tasks|projects|notes|drive|learning|habits|finance|calendar|today|reminders|reports|settings|planner}', run: (a, ctx) => {
+  open: { desc: 'open {panel: tasks|projects|drive|learning|habits|finance|calendar|today|reminders|track|reports|settings|planner}', run: (a, ctx) => {
     const key = clean(a.panel ?? a.name, 20).toLowerCase();
-    const ok = ['tasks', 'projects', 'notes', 'drive', 'learning', 'habits', 'finance', 'calendar', 'today', 'reminders', 'reports', 'settings', 'planner'];
+    const ok = ['tasks', 'projects', 'drive', 'learning', 'habits', 'finance', 'calendar', 'today', 'reminders', 'track', 'reports', 'settings', 'planner'];
     if (!ok.includes(key)) return `Unknown panel "${key}"`;
     if (key === 'planner') { ctx.ui?.showPlannerInline?.(true); ctx.ui?.setPanel?.(null); } else ctx.ui?.setPanel?.(key);
     return `Opened ${key}`;
@@ -302,7 +358,7 @@ export async function runActions(actions, ctx) {
 }
 
 // ---------- plain-English shortcuts (work without a model) ----------
-const ATTACH = /^(?:please\s+|can you\s+|could you\s+)?(?:add|put|save|attach|move|upload|send|store|keep|file)\s+(?:this|that|the|it|these|those|my)?\s*(?:file|files|pdf|doc|document|docs|image|screenshot|attachment|it)?\s*(?:file)?\s*(?:to|into|in|under|on)\s+(?:my\s+|the\s+)?(learning|drive|vault|projects?|notes?)(?:\s*(?:pipeline|list|section|tab|folder))?\s*(?:(?:[:-]|called|named|as|under|for|in)\s*(.+))?$/i;
+const ATTACH = /^(?:please\s+|can you\s+|could you\s+)?(?:add|put|save|attach|move|upload|send|store|keep|file)\s+(?:this|that|the|it|these|those|my)?\s*(?:file|files|pdf|doc|document|docs|image|screenshot|attachment|it)?\s*(?:file)?\s*(?:to|into|in|under|on)\s+(?:my\s+|the\s+)?(learning|drive|vault|projects?)(?:\s*(?:pipeline|list|section|tab|folder))?\s*(?:(?:[:-]|called|named|as|under|for|in)\s*(.+))?$/i;
 const GENERATE = /^(?:please\s+|can you\s+|could you\s+)?(?:create|generate|make|write|draft|prepare|build)\s+(?:me\s+)?(?:a|an|the)?\s*(?:short\s+|quick\s+|detailed\s+|simple\s+|one[- ]page\s+)?(pdf|markdown|md|text|txt|csv|html|json|doc|document|file|notes?|guide|cheat\s*sheet|summary|study\s+(?:sheet|notes|guide|plan)|report|checklist|outline|syllabus)\b\s*(?:file|document)?\s*(?:about|on|for|of|covering|explaining|summari[sz]ing|from)?\s*(.+?)(?:\s*(?:,|and|then|&)?\s*(?:add|save|put|attach|store|keep|file)\s+(?:it\s+|this\s+|that\s+)?(?:to|into|in|under)\s+(?:my\s+|the\s+)?(learning|drive|vault|projects?|files?)(?:\s+(?:called|named|as|under|for|in)?\s*(.+))?)?\s*[.!]?$/i;
 
 /**
@@ -315,7 +371,7 @@ export async function localActionIntent(q, ctx) {
   if (m && (ctx.files?.length)) {
     const target = m[1].toLowerCase();
     const name = clean(m[2], 80);
-    const to = /^proj/.test(target) ? 'project' : /^note/.test(target) ? 'note' : /^learn/.test(target) ? 'learning' : 'drive';
+    const to = /^proj/.test(target) ? 'project' : /^learn/.test(target) ? 'learning' : 'drive';
     const lines = [];
     for (const f of ctx.files.slice(0, 5)) lines.push(`✅ ${await placeFile(ctx, f, { to, learning: to === 'learning' ? name : null, project: to === 'project' ? name : null, title: to !== 'project' && to !== 'learning' ? name : null })}`);
     return lines.join('\n');

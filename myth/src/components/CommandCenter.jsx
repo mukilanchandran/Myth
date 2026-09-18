@@ -400,7 +400,7 @@ export function TriageModal({ opened, onClose, items, onOpen }) {
                   </>
                 )}
                 {it.ref.type === 'event' && (
-                  <Button size="xs" radius="xl" variant="light" color="violet" onClick={() => go(it.ref.source === 'note' ? 'notes' : 'calendar')}>Open</Button>
+                  <Button size="xs" radius="xl" variant="light" color="violet" onClick={() => go('calendar')}>Open</Button>
                 )}
                 {it.ref.type === 'project' && (
                   <Button size="xs" radius="xl" variant="light" color="orange" onClick={() => go('projects')}>Open project</Button>

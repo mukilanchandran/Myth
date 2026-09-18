@@ -15,7 +15,8 @@ import { providerFor, PROVIDERS } from './providers';
 import { commandCenter, fmtDuration } from './commandCenter';
 import { mithNow, nowText, nowBrief } from './mithNow';
 import { detectProjectIntent, describePlan, normalizeAiPlan, TEMPLATES } from './projectPlanner';
-import { actionCatalogue, parseActions, visibleText, runActions, localActionIntent } from './actions';
+import { actionCatalogue, parseActions, visibleText, runActions, localActionIntent, ACTIONS } from './actions';
+import { looksLikeWorkLog, workRundown, timeOnProject, trackForAi, rangeFor, entriesOn, projectName, fmtMinutes, statusOf, WORK_STATUSES } from './worklog';
 import { useUI } from '../store/useUI';
 import { putBlob, getBlob } from '../store/fileStore';
 import { APP_NAME } from '../config/env';
@@ -29,10 +30,10 @@ const LEARNING_STAGES = ['want to learn', 'learning', 'applied', 'taught/shared'
 // Clear question phrasing — never a capture, always an answer.
 const QUESTION = /^(what|how|which|when|who|why|where|can|could|should|would|is|are|am|do|does|did|tell|explain|show|hi|hey|hello|thanks|thank)\b|^(?:prep(?:are)?\s+me|brief\s+me|get\s+me\s+ready)\b|\?$/i;
 
-// Captures the parser is sure about ("spent 250 on lunch", "habit: read", "idea: …",
+// Captures the parser is sure about ("spent 250 on lunch", "habit: read",
 // "meeting with Ravi tomorrow 10am"). A plain sentence that would only become a
 // task is left to the model, which may decide it is a question, an action or chat.
-const SURE_KINDS = new Set(['expense', 'income', 'habit', 'idea', 'note', 'journal', 'birthday', 'meeting', 'event', 'reminder', 'learning', 'plan', 'project']);
+const SURE_KINDS = new Set(['expense', 'income', 'habit', 'journal', 'birthday', 'meeting', 'event', 'reminder', 'worklog', 'learning', 'plan', 'project']);
 function sureCaptures(text, state) {
   if (QUESTION.test(text)) return null;
   const items = parseMulti(text, state.projects);
@@ -83,7 +84,28 @@ export function localAnswer(q, state) {
     return reminderRundown(state);
   }
 
-  // "what did I work on <day>" / "what did I do"
+  // Track: "how much time did I spend on GHMC this week?" / "time on Acme last week"
+  const onProject = text.match(/(?:how (?:much time|long|many hours)|time (?:spent|tracked|logged)|hours (?:spent|tracked|logged)).*?\b(?:on|for|in)\s+(?:the\s+|project\s+)?["']?(.+?)["']?\s*(?:\b(today|yesterday|this week|last week|this month|last month)\b)?\s*\??$/);
+  if (onProject && !/^(?:today|yesterday|this week|last week|this month|last month|work)$/.test(onProject[1].trim())) {
+    const name = onProject[1].replace(/\b(?:today|yesterday|this week|last week|this month|last month)\b/g, '').trim();
+    if (name) return timeOnProject(state, name, onProject[2] ?? (text.match(/today|yesterday|this week|last week|this month|last month/)?.[0] ?? 'this week'));
+  }
+  // Track: "what did I work on today / yesterday / this week", "my work log", "daily summary", "time tracked today", "standup"
+  if (/what (?:did|have) i (?:work(?:ed)? on|do(?:ne)?|track(?:ed)?)|\b(?:work\s*log|time\s*(?:log|sheet|tracked|tracking)|hours (?:tracked|logged|worked)|tracked (?:time|work|hours)|work(?:ing)? summary|daily (?:work )?summary|stand-?up|how (?:much|long|many hours) (?:did|have) i work(?:ed)?)\b/.test(text) && (state.worklog ?? []).length) {
+    const when = text.match(/last week|this week|last month|this month|yesterday|today|\bweek\b|\bmonth\b|\d{4}-\d{2}-\d{2}|(?:on |last )?(?:mon|tues|wednes|thurs|fri|satur|sun)day/)?.[0] ?? 'today';
+    const out = workRundown(state, when);
+    // a single day also lists what Myth knows outside the log: finished tasks
+    const r = rangeFor(when);
+    if (r.from === r.to) {
+      const ref = dayjs(r.from);
+      const logged = entriesOn(state.worklog ?? [], r.from).map((e) => e.title.toLowerCase());
+      const extra = tasks.filter((t) => t.completedAt && dayjs(t.completedAt).isSame(ref, 'day') && !logged.includes(t.title.toLowerCase()));
+      if (extra.length) return `${out}\n\nAlso completed (not in the log): ${extra.map((t) => t.title).join(', ')}`;
+    }
+    return out;
+  }
+
+  // "what did I work on <day>" / "what did I do" — before anything is tracked: finished tasks
   const dayMatch = text.match(/what (?:did|have) i (?:work(?:ed)? on|do(?:ne)?)\s*(.*)/);
   if (dayMatch) {
     let ref = dayjs();
@@ -96,12 +118,10 @@ export function localAnswer(q, state) {
       }
     }
     const done = tasks.filter((t) => t.completedAt && dayjs(t.completedAt).isSame(ref, 'day'));
-    const notes = state.notes.filter((n) => dayjs(n.created).isSame(ref, 'day'));
-    if (!done.length && !notes.length) return `Nothing recorded for ${ref.format('dddd, MMM D')}.`;
+    if (!done.length) return `Nothing recorded for ${ref.format('dddd, MMM D')}.`;
     return [
       `On ${ref.format('dddd, MMM D')}:`,
       ...done.map((t) => `• Completed: ${t.title}`),
-      ...notes.map((n) => `• ${n.type[0].toUpperCase()}${n.type.slice(1)}: ${n.title}`),
     ].join('\n');
   }
 
@@ -213,7 +233,7 @@ export function localAnswer(q, state) {
       '• Today\'s plan — "what\'s my plan today?", "plan: review designs", "mark <item> done"',
       '• Tasks & priorities — "what\'s overdue?", "add task pay rent tomorrow"',
       '• Projects — "project progress?"',
-      '• Notes, ideas & meetings — "recent ideas?", "add meeting with client friday 3pm"',
+      '• Meetings — "what meetings do I have this week?", "add meeting with client friday 3pm"',
       '• Habits & streaks — "how are my habits?"',
       '• Money — "how much did I spend this month?", "spent 250 on lunch"',
       '• Journal & mood — "how was my week?"',
@@ -266,13 +286,7 @@ export function localAnswer(q, state) {
 
   if (/how (?:am i doing|is my (?:progress|month))|productivity/.test(text)) {
     const stats = monthStats(state, dayjs().format('YYYY-MM-DD'));
-    return `This month: ${stats.completed} done / ${stats.created} created (${stats.completionRate}%), ${stats.overdue} overdue, ${stats.meetings} meetings, ${stats.ideas} ideas. Ask "generate my monthly report" for the full story.`;
-  }
-
-  if (/idea/.test(text)) {
-    const ideas = state.notes.filter((n) => n.type === 'idea').slice(0, 8);
-    if (!ideas.length) return 'Your idea vault is empty. Tell me "idea: ..." to start filling it.';
-    return ['Recent ideas:', ...ideas.map((n) => `• ${n.title}`)].join('\n');
+    return `This month: ${stats.completed} done / ${stats.created} created (${stats.completionRate}%), ${stats.overdue} overdue, ${stats.meetings} meetings. Ask "generate my monthly report" for the full story.`;
   }
 
   if (/habit|streak/.test(text)) {
@@ -311,7 +325,6 @@ function buildContext(state) {
   const recentDone = state.tasks
     .filter((t) => t.completedAt && dayjs(t.completedAt).isAfter(dayjs().subtract(7, 'day')))
     .slice(0, 15);
-  const recentNotes = state.notes.slice(0, 10);
   const plan = todayPlanItems(state);
   const { points, streakCount } = state.xp;
   const cc = commandCenter(state);
@@ -359,7 +372,6 @@ function buildContext(state) {
     openTasks: open.map((t) => ({ title: t.title, due: t.due, priority: t.priority, status: t.status })),
     completedLast7Days: recentDone.map((t) => ({ title: t.title, at: t.completedAt?.slice(0, 10) })),
     projects: state.projects.map((p) => ({ name: p.name, status: p.status, deadline: p.deadline })),
-    recentNotes: recentNotes.map((n) => ({ type: n.type, title: n.title })),
     habitsToday: state.habits.map((h) => ({ name: h.name, done: !!h.log[today] })),
     // Reminders — nudges at a time, once or on repeat (ai/reminders.js)
     reminders: (() => {
@@ -367,6 +379,8 @@ function buildContext(state) {
       const pack = (r) => ({ title: r.title, when: describeWhen(r), repeat: r.repeat && r.repeat !== 'none' ? REPEATS[r.repeat] : undefined, note: r.note || undefined });
       return { overdue: g.overdue.slice(0, 6).map(pack), today: g.today.slice(0, 8).map(pack), tomorrow: g.tomorrow.slice(0, 5).map(pack), thisWeek: g.week.slice(0, 6).map(pack), laterCount: g.later.length };
     })(),
+    // Track — the daily work log: what was worked on, for how long, on which project (ai/worklog.js)
+    workLog: trackForAi(state),
     upcomingEvents: upcomingEvents(state, 30).slice(0, 12).map((e) => ({ title: e.title, date: e.next.format('YYYY-MM-DD'), time: e.time, kind: e.kind, location: e.location ?? undefined, participants: e.participants ?? undefined })),
     learningPipeline: (state.learning ?? []).map((l) => ({ title: l.title, stage: LEARNING_STAGES[l.stage] ?? 'want to learn', files: (l.fileIds ?? []).length, links: (l.links ?? []).length, notes: l.notes ? l.notes.slice(0, 80) : undefined })),
     // files handed to the assistant in this conversation (newest first) — the id is what actions refer to
@@ -380,7 +394,6 @@ function buildContext(state) {
     counts: {
       driveItems: (state.drive ?? []).length,
       files: (state.files ?? []).length,
-      notes: state.notes.length,
       habits: state.habits.length,
       journalEntries: state.journal.length,
     },
@@ -395,10 +408,11 @@ function systemPrompt(state) {
     `You can answer ANY question, on two levels:`,
     `1) Questions about the user's life (tasks, money, habits, projects, schedule) — answer concretely from the live DATA snapshot below. Never invent numbers about their data; if something isn't in DATA, say so.`,
     `2) Everything else — general knowledge, geography, science, history, math, advice, writing, ideas — answer fully and confidently from your own knowledge, like any capable AI assistant. The DATA snapshot is context about the user, NOT a limit on what you know. Never refuse a general question by saying "my data doesn't have that".`,
-    `You know the Myth app inside-out. Its features (all reflected in DATA): Today's plan (todayPlan — the morning "what I'll do today" pills in the Myth AI box; each item can be ticked done; user can add via "plan: ..." or the Set today's plan button), the Myth AI bar (free text/voice → auto-routed to tasks, ideas, notes, meetings, expenses, income, habits, birthdays, events, learning, journal, plan items), Tasks (priorities 1-5, due dates, statuses), Projects (tasks link to them), Notes/Ideas/Meetings vault, Habits with streaks, Finance (₹ expenses/income by category), Journal (mood & energy 1-5), Learning pipeline (want-to-learn → learning → applied → taught), Calendar events & yearly birthdays, Drive (private file/password vault — you see counts only, contents stay private), Reports (monthly reviews), XP/levels/streak gamification. Work and personal live in one combined flow.`,
+    `You know the Myth app inside-out. Its features (all reflected in DATA): Today's plan (todayPlan — the morning "what I'll do today" pills in the Myth AI box; each item can be ticked done; user can add via "plan: ..." or the Set today's plan button), the Myth AI bar (free text/voice → auto-routed to tasks, meetings, expenses, income, habits, birthdays, events, learning, journal, plan items), Tasks (priorities 1-5, due dates, statuses), Projects (tasks link to them), Habits with streaks, Finance (₹ expenses/income by category), Journal (mood & energy 1-5), Learning pipeline (want-to-learn → learning → applied → taught), Calendar events & yearly birthdays, Drive (private file/password vault — you see counts only, contents stay private), Reports (monthly reviews), XP/levels/streak gamification. Work and personal live in one combined flow.`,
     `Meetings are plain calendar entries (DATA.upcomingEvents with kind "meeting", carrying time, location and participants when known). When asked about meetings, answer from the calendar — there is no separate meeting-prep feature.`,
     `Notification intelligence (DATA.notifications): the things worth interrupting the user for right now, each with its reasoning — what, by when, how long it needs, whether the day has room. When asked what to handle first or why something was flagged, answer from it; never invent urgency that isn't there.`,
     `Reminders (DATA.reminders): nudges that fire as notifications at their time, once or on repeat (daily, weekdays, weekly, monthly, yearly), with snooze. A reminder is a nudge, a task is work — "remind me to call Ravi at 5" is a reminder (add_reminder), "call Ravi" alone is a task. Questions like "what are my reminders", "anything overdue", "what's on for tomorrow" are answered from DATA.reminders. complete_reminder, snooze_reminder and delete_reminder act on them by title; list_reminders reads them back.`,
+    `Track (DATA.workLog): the daily work log — the list of what Boss actually did each day: a name, a description, the project and a status (Done, In progress, In review, Blocked). Time spent is optional and only recorded when Boss says it. It is the record of what HAPPENED (tasks are what is planned). "Worked on the GHMC dashboard", "today I fixed the login bug", "spent 45 min on code review", "still working on the export — blocked by the API" → log_work (project name in "project" whenever one is mentioned, extra detail in "description", "status" when it is not done, "duration" only if a length was said). Several things in one message → one log_work each. "Mark the export as done" / "the API work is blocked" → update_work. "Start timer for X" → start_timer; "stop timer" → stop_timer. "What did I work on today / yesterday / this week", "what is still open", "what did I do on <project>", "write my standup / daily summary" → answer from DATA.workLog (today, yesterday, thisWeek.perDay / byProject / byStatus / stillOpen, streakDays): list the items with their status; mention hours only where minutes exist. When asked to write or save the day's summary, write 3-5 short first-person lines from the entries and emit save_work_summary. Never invent work or time that is not in DATA.workLog.`,
     `When asked about today's plan, answer from DATA.todayPlan (items with done flags). Questions about ANY feature above — how it works, what's in it, progress — answer them; never claim you lack access to a Myth feature.`,
     `The home screen is the Life Command Center: DATA.commandCenter holds the day progress, what needs attention, today's timeline and the plan you suggest (focus blocks that fit between events). When asked what matters now, what to do next or what the plan is, answer from it, and mention they can say "follow the plan" to put the focus blocks on today's calendar.`,
     `Myth Daily Brief (DATA.dailyBrief): the status card at the top of the home screen — today's numbers (tasks · meetings · deadlines), the one thing to finish (focus), what is slipping (potentialProblem: a project behind schedule, overdue work, a missed reminder), the personal line (bills, birthdays, personal reminders, habits), the learning slot and a suggested schedule for the day. "Brief me", "morning brief", "how does my day look" → answer from it in the same order. It is rebuilt from live data all day, so it is always current.`,
@@ -554,24 +568,6 @@ export async function aiMithNow(result, state) {
   }
 }
 
-// Summarize a meeting note into crisp minutes + action items.
-export async function aiMeetingSummary(note, state) {
-  const ai = await resolveAI(state);
-  if (!ai.ok) return null;
-  const m = note.meeting ?? {};
-  const text = await streamChat({
-    endpoint: ai.endpoint, model: ai.model, apiKey: ai.apiKey,
-    messages: [
-      { role: 'system', content: 'You summarize meeting notes into short, plain-text minutes. No markdown symbols, no emojis.' },
-      {
-        role: 'user',
-        content: `Summarize this meeting in up to 5 short lines, then list action items as "- owner: action" lines.\nTitle: ${note.title}\nDate: ${m.date ?? ''} ${m.time ?? ''}\nParticipants: ${m.participants ?? ''}\nAgenda/discussion: ${m.agenda ?? ''}\nAction items noted: ${m.actions ?? ''}\nExtra notes: ${note.body ?? ''}`,
-      },
-    ],
-  });
-  return text ? { text, model: ai.model } : null;
-}
-
 // Tailor a project template to the user's own sentence. Returns milestone
 // templates (validated by normalizeAiPlan) or null — the built-in template
 // stays when the model is slow, offline or returns junk. Never throws.
@@ -598,6 +594,30 @@ export async function aiProjectPlan(intent, state) {
     ]);
     const json = text?.match(/\{[\s\S]*\}/)?.[0];
     return json ? normalizeAiPlan(JSON.parse(json)) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Track: have the model write the day's summary from the log entries (the
+// "Write with Myth AI" button). Returns the text, or null when no model answers —
+// the panel then keeps the automatic summary.
+export async function writeWorkSummary(store, date) {
+  const state = store.getState();
+  const entries = entriesOn(state.worklog ?? [], date);
+  if (!entries.length) return null;
+  try {
+    const ai = await resolveAI(state);
+    if (!ai.ok) return null;
+    const rows = entries.map((e) => ({ what: e.title, description: e.note || undefined, project: projectName(e, state.projects) || undefined, status: WORK_STATUSES[statusOf(e)].label, spent: e.minutes > 0 ? fmtMinutes(e.minutes) : undefined }));
+    const text = await streamChat({
+      endpoint: ai.endpoint, model: ai.model, apiKey: ai.apiKey, temperature: 0.4,
+      messages: [
+        { role: 'system', content: 'You write a concise end-of-day work summary from a log of what a person did that day, in the first person, for the person who did the work. 3 to 5 short plain-text lines: what got done (group by project, name the projects), what is still in progress, in review or blocked, and one line on what to pick up next if the log hints at it. Mention time only if the log records it. No markdown, no headings, no bullet symbols other than "•", no preamble, no sign-off. Never invent work that is not in the log.' },
+        { role: 'user', content: `Date: ${dayjs(date).format('dddd, MMMM D, YYYY')}\nLog: ${JSON.stringify(rows)}` },
+      ],
+    });
+    return text?.trim() || null;
   } catch {
     return null;
   }
@@ -653,6 +673,24 @@ export async function askAssistant(q, store, onToken, opts = {}) {
     const parsed = parseCapture(trimmed, state.projects);
     if (parsed?.kind === 'reminder') return `${executeCapture(parsed, store)} ✅`;
   }
+  // Track, without a model: "start timer for GHMC api" / "start tracking …" / "stop timer" / "discard timer"
+  const timerStart = trimmed.match(/^(?:please\s+)?(?:start|begin|run)\s+(?:a\s+|the\s+|my\s+)?(?:work\s+)?(?:timer|tracking|tracker|clock)\s*(?:(?:for|on)\b|:|-)?\s*(.*)$/i) ?? trimmed.match(/^(?:please\s+)?(?:track|time)\s+(?:me\s+)?(?:working\s+)?on\s+(.+)$/i);
+  if (timerStart) {
+    const title = timerStart[1].replace(/[.!]+$/, '').trim();
+    if (!title) return 'What are you working on, Boss? Say "start timer for <what>".';
+    return `✅ ${await ACTIONS.start_timer.run({ title }, ctx)} ⏱`;
+  }
+  if (/^(?:please\s+)?(?:stop|end|finish|pause)\s+(?:the\s+|my\s+)?(?:work\s+)?(?:timer|tracking|tracker|clock)\b/i.test(trimmed)) return `✅ ${await ACTIONS.stop_timer.run({}, ctx)}`;
+  if (/^(?:please\s+)?(?:discard|cancel|drop|reset)\s+(?:the\s+|my\s+)?(?:work\s+)?(?:timer|tracking|tracker)\b/i.test(trimmed)) {
+    if (!state.worklogTimer) return 'No timer is running, Boss.';
+    state.stopWorkTimer({ discard: true });
+    return 'Timer discarded — nothing was logged.';
+  }
+  // "worked on GHMC dashboard for 2h" / "log work: …" — a work log, without a model
+  if (looksLikeWorkLog(trimmed)) {
+    const items = parseMulti(trimmed, state.projects);
+    if (items.length && items.every((i) => i.kind === 'worklog')) return fileAll(items, store);
+  }
   // "snooze <reminder> [for 1 hour / until tomorrow 9am]"
   const snooze = trimmed.match(/^snooze\s+(?:the\s+)?(?:reminder\s+)?(.+?)(?:\s+(?:for|until|till|to)\s+(.+))?\s*$/i);
   if (snooze) {
@@ -706,6 +744,12 @@ export async function askAssistant(q, store, onToken, opts = {}) {
       const repeating = reminder.repeat && reminder.repeat !== 'none';
       return `Reminder "${reminder.title}" done ✅${repeating ? ` — next one ${describeWhen(store.getState().reminders.find((r) => r.id === reminder.id)).toLowerCase()}.` : ''}`;
     }
+    // Track: a logged item that was still in progress / in review / blocked
+    const work = (state.worklog ?? []).find((w) => statusOf(w) !== 'done' && w.title.toLowerCase().includes(phrase));
+    if (work) {
+      state.updateWorkLog(work.id, { status: 'done' });
+      return `"${work.title}" marked done in Track ✅`;
+    }
   }
 
   // "follow the plan" / "apply your plan" — put the Command Center's focus blocks on today's calendar
@@ -727,7 +771,7 @@ export async function askAssistant(q, store, onToken, opts = {}) {
   }
 
   // If the message looks like a capture command, capture it.
-  if (/^(add|create|new)\s+(task|note|idea|habit|meeting|project|event|expense|income|learning|journal)\b/i.test(q)) {
+  if (/^(add|create|new)\s+(task|habit|meeting|project|event|expense|income|learning|journal)\b/i.test(q)) {
     const cleaned = q.replace(/^(add|create|new)\s+/i, '');
     const parsed = parseCapture(cleaned, state.projects);
     if (parsed) return executeCapture(parsed, store);

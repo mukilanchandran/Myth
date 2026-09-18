@@ -267,7 +267,7 @@ export default function RemindersPanel() {
             </Anchor>
             {showDone && <Anchor fz={12} c="red" onClick={clearDone}>Clear done</Anchor>}
           </Group>
-          <Collapse in={showDone}>
+          <Collapse expanded={showDone}>
             <div className="rem-list">
               {groups.done.slice(0, 30).map((r) => <ReminderRow key={r.id} r={r} now={now} onEdit={setEditing} />)}
             </div>

@@ -158,7 +158,7 @@ export default function ChatAssistant({ initialQuestion, onConsumedInitial, comp
           <>
             {chat.length === 0 && (
               <Stack gap={8} mt="md">
-                <Text fz={12.5} c="dimmed">I can answer, and I can act — tasks, notes, money, habits, projects, files, learning, the planner. Drop a PDF here and say where it goes. Try:</Text>
+                <Text fz={12.5} c="dimmed">I can answer, and I can act — tasks, money, habits, projects, files, learning, the planner. Drop a PDF here and say where it goes. Try:</Text>
                 <Group gap={compact ? 6 : 8} align="flex-start" style={compact ? undefined : { flexDirection: 'column' }}>
                   {(compact ? SUGGESTIONS.slice(0, 5) : SUGGESTIONS).map((s) => (
                     <Button key={s} variant="light" color="forest" radius="xl" size={compact ? 'compact-xs' : 'xs'} onClick={() => ask(s)}>

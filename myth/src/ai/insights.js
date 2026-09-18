@@ -1,6 +1,6 @@
 // Analytics + report generation over the local dataset.
 // Everything lives in one flow, so a month's stats cover tasks, projects,
-// notes, money, habits and journal together.
+// meetings, money, habits and journal together.
 import dayjs from 'dayjs';
 
 export function monthStats(state, monthISO) {
@@ -13,9 +13,8 @@ export function monthStats(state, monthISO) {
   const overdue = tasks.filter((t) => t.status !== 'done' && t.due && dayjs(t.due).isBefore(dayjs(), 'day'));
   const open = tasks.filter((t) => t.status !== 'done');
 
-  const notes = (state.notes ?? []).filter((n) => inMonth(n.created));
-  const meetings = notes.filter((n) => n.type === 'meeting');
-  const ideas = notes.filter((n) => n.type === 'idea');
+  // meetings are calendar entries
+  const meetings = (state.events ?? []).filter((e) => e.kind === 'meeting' && inMonth(e.date));
 
   const projectProgress = (state.projects ?? []).map((p) => {
     const pt = tasks.filter((t) => t.projectId === p.id);
@@ -60,8 +59,6 @@ export function monthStats(state, monthISO) {
     overdue: overdue.length,
     open: open.length,
     meetings: meetings.length,
-    ideas: ideas.length,
-    notes: notes.length,
     projectProgress,
     weekly,
     topTasks: [...completed].sort((a, b) => b.priority - a.priority).slice(0, 5),
@@ -82,8 +79,7 @@ export function narrative(stats, name) {
   if (stats.completed > 0) lines.push(`You completed ${stats.completed} task${stats.completed > 1 ? 's' : ''} (${stats.completionRate}% completion rate).`);
   else lines.push(`No tasks were completed this month — a fresh slate to build momentum.`);
   if (stats.overdue > 0) lines.push(`${stats.overdue} task${stats.overdue > 1 ? 's are' : ' is'} overdue — worth clearing or rescheduling this week.`);
-  if (stats.meetings > 0) lines.push(`You logged ${stats.meetings} meeting${stats.meetings > 1 ? 's' : ''} with notes.`);
-  if (stats.ideas > 0) lines.push(`${stats.ideas} new idea${stats.ideas > 1 ? 's' : ''} captured in your vault.`);
+  if (stats.meetings > 0) lines.push(`You had ${stats.meetings} meeting${stats.meetings > 1 ? 's' : ''} on the calendar.`);
   const active = stats.projectProgress.filter((p) => p.total > 0);
   if (active.length) {
     const best = [...active].sort((a, b) => b.pct - a.pct)[0];
@@ -102,7 +98,6 @@ export function narrative(stats, name) {
   if (stats.completionRate < 60 && stats.created > 3) improve.push('commit to fewer tasks and finish them');
   if (stats.overdue > 2) improve.push('review deadlines every morning');
   if (stats.habitStats.length && stats.habitConsistency < 50) improve.push('anchor habits to a fixed time of day');
-  if (stats.meetings === 0) improve.push('log meeting notes so nothing is lost');
   if (stats.savings < 0) improve.push('keep spending under what comes in');
   if (improve.length) lines.push(`Next month, focus on: ${improve.join('; ')}.`);
   return lines;

@@ -3,7 +3,7 @@
 // question Mith is waiting on ("Want me to move them?"). Session-only —
 // never persisted, reset on reload.
 export const memory = {
-  lastItem: null,      // { type: 'task' | 'note' | 'idea' | 'event' | 'habit' | 'project', id, title }
+  lastItem: null,      // { type: 'task' | 'event' | 'habit' | 'project', id, title }
   lastProjectId: null, // the project last mentioned, created or attached to
   pending: null,       // { kind: 'confirm' | 'pick-project', prompt, ...payload }
   lastReply: '',

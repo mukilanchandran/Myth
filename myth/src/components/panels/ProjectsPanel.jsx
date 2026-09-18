@@ -5,7 +5,7 @@ import {
 } from '@mantine/core';
 import {
   IconPlus, IconTrash, IconArrowLeft, IconUpload, IconDownload, IconDots,
-  IconFile, IconPhoto, IconFileTypePdf, IconChecklist, IconNotes, IconPaperclip,
+  IconFile, IconPhoto, IconFileTypePdf, IconChecklist, IconPaperclip,
   IconFlag, IconCalendarEvent, IconTargetArrow, IconPlayerPause, IconCircleCheck,
 } from '@tabler/icons-react';
 import { DateInput } from '@mantine/dates';
@@ -13,7 +13,6 @@ import dayjs from 'dayjs';
 import { useStore, uid } from '../../store/useStore';
 import EmptyState from '../EmptyState';
 import { putBlob, getBlob, deleteBlob, downloadBlob } from '../../store/fileStore';
-import { NoteEditor } from './NotesPanel';
 
 function fileIcon(type) {
   if (type?.startsWith('image/')) return <IconPhoto size={16} color="#7048e8" />;
@@ -41,14 +40,12 @@ function DeadlineBadge({ deadline, size = 'xs' }) {
 
 function ProjectDetail({ project, onBack }) {
   const state = useStore();
-  const { updateProject, tasks, notes, files, addTask, addNote, addFileMeta, deleteFileMeta, completeTask, updateTask, deleteTask } = state;
+  const { updateProject, tasks, files, addTask, addFileMeta, deleteFileMeta, completeTask, updateTask, deleteTask } = state;
   const [quickTask, setQuickTask] = useState('');
   const [quickMilestone, setQuickMilestone] = useState('');
-  const [editNote, setEditNote] = useState(null);
   const [preview, setPreview] = useState(null);
 
   const pTasks = tasks.filter((t) => t.projectId === project.id);
-  const pNotes = notes.filter((n) => n.projectId === project.id);
   const pFiles = files.filter((f) => f.projectId === project.id);
   const pct = pTasks.length ? Math.round((pTasks.filter((t) => t.status === 'done').length / pTasks.length) * 100) : 0;
 
@@ -110,7 +107,6 @@ function ProjectDetail({ project, onBack }) {
         <Tabs.List>
           <Tabs.Tab value="tasks" leftSection={<IconChecklist size={15} />}>Tasks ({pTasks.length})</Tabs.Tab>
           <Tabs.Tab value="milestones" leftSection={<IconFlag size={15} />}>Milestones ({(project.milestones ?? []).length})</Tabs.Tab>
-          <Tabs.Tab value="notes" leftSection={<IconNotes size={15} />}>Notes & meetings ({pNotes.length})</Tabs.Tab>
           <Tabs.Tab value="files" leftSection={<IconPaperclip size={15} />}>Documents ({pFiles.length})</Tabs.Tab>
         </Tabs.List>
 
@@ -189,33 +185,6 @@ function ProjectDetail({ project, onBack }) {
           </Stack>
         </Tabs.Panel>
 
-        <Tabs.Panel value="notes" pt="md">
-          <Group mb="sm" gap="xs">
-            <Button size="xs" radius="xl" variant="light" leftSection={<IconPlus size={14} />}
-              onClick={() => setEditNote(addNote({ title: 'New note', projectId: project.id }))}>
-              Note
-            </Button>
-            <Button size="xs" radius="xl" variant="light" color="violet" leftSection={<IconPlus size={14} />}
-              onClick={() => setEditNote(addNote({
-                title: 'New meeting', type: 'meeting', projectId: project.id,
-                meeting: { date: dayjs().format('YYYY-MM-DD'), time: '', participants: '', agenda: '', actions: '' },
-              }))}>
-              Meeting note
-            </Button>
-          </Group>
-          <Stack gap={6}>
-            {pNotes.map((n) => (
-              <Box key={n.id} className="glass" p="sm" style={{ borderRadius: 12, cursor: 'pointer' }} onClick={() => setEditNote(n)}>
-                <Group gap={8}>
-                  <Badge size="xs" variant="light" color={n.type === 'meeting' ? 'violet' : n.type === 'idea' ? 'yellow' : 'teal'}>{n.type}</Badge>
-                  <Text fz={13.5} fw={600}>{n.title}</Text>
-                  <Text fz={11.5} c="dimmed" ml="auto">{dayjs(n.updated).format('MMM D')}</Text>
-                </Group>
-              </Box>
-            ))}
-          </Stack>
-        </Tabs.Panel>
-
         <Tabs.Panel value="files" pt="md">
           <FileButton onChange={upload} multiple>
             {(props) => <Button {...props} size="xs" radius="xl" variant="light" leftSection={<IconUpload size={14} />}>Upload documents, designs, images</Button>}
@@ -242,7 +211,6 @@ function ProjectDetail({ project, onBack }) {
         </Tabs.Panel>
       </Tabs>
 
-      {editNote && <NoteEditor note={notes.find((n) => n.id === editNote.id) ?? editNote} onClose={() => setEditNote(null)} />}
       <Modal opened={!!preview} onClose={() => { URL.revokeObjectURL(preview?.url); setPreview(null); }} title={preview?.name} size="lg" radius="lg">
         {preview && <Image src={preview.url} radius="md" />}
       </Modal>
@@ -312,7 +280,7 @@ export default function ProjectsPanel() {
           </Button>
         </Stack>
       </Modal>
-      {mine.length === 0 && <EmptyState kind="projects" color="#e8590c" title="No projects yet" hint="A project holds tasks, milestones, meeting notes and documents in one place. Say what you're launching and Myth drafts one." />}
+      {mine.length === 0 && <EmptyState kind="projects" color="#e8590c" title="No projects yet" hint="A project holds tasks, milestones and documents in one place. Say what you're launching and Myth drafts one." />}
       {mine.map((p) => {
         const pt = tasks.filter((t) => t.projectId === p.id);
         const pct = pt.length ? Math.round((pt.filter((t) => t.status === 'done').length / pt.length) * 100) : 0;

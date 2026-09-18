@@ -5,12 +5,16 @@ import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import dayjs from 'dayjs';
 import { APP_PASSWORD as PASSWORD, asset } from '../config/env';
+import { warmHomeVideo } from '../homeVideo';
 
 export default function Login() {
   const login = useStore((s) => s.login);
   const [pw, setPw] = useState('');
   const [error, setError] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
+
+  // the home backdrop video downloads while the password is being typed
+  useEffect(() => { warmHomeVideo(); }, []);
 
   // auto-validate: unlock the moment the correct password is typed
   useEffect(() => {

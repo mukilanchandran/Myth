@@ -44,24 +44,16 @@ export function greeting(now = dayjs()) {
 }
 
 // ---------- today's schedule ----------
-// Events dated today (yearly ones by month-day) plus meeting notes for today.
-// A meeting captured from the bar creates both a note and an event, so the
-// note is dropped when an event with the same title and time already exists.
+// Events dated today (yearly ones by month-day) — meetings are calendar entries too.
 export function todayEvents(state, now = dayjs()) {
   const key = keyOf(now);
   const md = now.format('MM-DD');
-  const evs = (state.events ?? [])
+  return (state.events ?? [])
     .filter((e) => e.date === key || (e.yearly && dayjs(e.date).format('MM-DD') === md))
     .map((e) => ({
       id: e.id, title: e.title, kind: e.kind ?? 'event',
       time: e.time || null, end: e.end || null, taskId: e.taskId ?? null, source: 'event',
     }));
-  const seen = new Set(evs.map((e) => `${e.title.toLowerCase()}|${e.time ?? ''}`));
-  const meetings = (state.notes ?? [])
-    .filter((n) => n.type === 'meeting' && n.meeting?.date === key)
-    .map((n) => ({ id: n.id, title: n.title, kind: 'meeting', time: n.meeting.time || null, end: null, taskId: null, source: 'note' }))
-    .filter((m) => !seen.has(`${m.title.toLowerCase()}|${m.time ?? ''}`));
-  return [...evs, ...meetings];
 }
 
 const endOf = (e) => (e.end ? toMin(e.end) : toMin(e.time) + DEFAULT_EVENT_MIN);

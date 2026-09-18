@@ -3,11 +3,11 @@
 // two decision cards beside it, the Planner inline, or an opened module, with
 // the icon rail on the right and the floating Myth AI in every module. Phones
 // and tablets: the same pieces stacked, with a floating tab bar and bottom sheets.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Drawer, Modal, Text, Tooltip, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Spotlight } from '@mantine/spotlight';
-import { IconChecklist, IconFolders, IconNotes, IconCalendarEvent, IconSearch, IconCompass, IconX, IconArrowsDiagonal, IconBellRinging } from '@tabler/icons-react';
+import { IconChecklist, IconFolders, IconNotes, IconCalendarEvent, IconSearch, IconCompass, IconX, IconArrowsDiagonal, IconBellRinging, IconClockPlay } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
@@ -31,7 +31,6 @@ import { asset } from '../config/env';
 import TodayPanel from './panels/TodayPanel';
 import TasksPanel from './panels/TasksPanel';
 import ProjectsPanel from './panels/ProjectsPanel';
-import NotesPanel from './panels/NotesPanel';
 import HabitsPanel from './panels/HabitsPanel';
 import FinancePanel from './panels/FinancePanel';
 import LearningPanel from './panels/LearningPanel';
@@ -40,13 +39,15 @@ import DrivePanel from './panels/DrivePanel';
 import ReportsPanel from './panels/ReportsPanel';
 import SettingsPanel from './panels/SettingsPanel';
 import RemindersPanel from './panels/RemindersPanel';
+import TrackPanel from './panels/TrackPanel';
+import { fmtMinutes } from '../ai/worklog';
+import { HOME_VIDEO, HOME_POSTER } from '../homeVideo';
 import './canvas.css';
 
 const PANEL_META = {
   today: { title: 'Daily planner', sub: 'Your day at a glance — score, priorities, meetings.', comp: TodayPanel },
   tasks: { title: 'Tasks', sub: 'Everything you committed to, sorted by urgency.', comp: TasksPanel },
-  projects: { title: 'Projects', sub: 'Tasks, milestones, meeting notes & documents in one place.', comp: ProjectsPanel },
-  notes: { title: 'Notes, ideas & meetings', sub: 'Your second brain — searchable and linked to projects.', comp: NotesPanel },
+  projects: { title: 'Projects', sub: 'Tasks, milestones & documents in one place.', comp: ProjectsPanel },
   drive: { title: 'Drive', sub: 'Private vault — paste screenshots, store files, passwords & links. Local only.', comp: DrivePanel },
   learning: { title: 'Learning pipeline', sub: 'Nothing counts as learned until it reaches Applied. Files, notes and links live on each card.', comp: LearningPanel },
   habits: { title: 'Habit tracker', sub: 'Small daily wins that compound.', comp: HabitsPanel },
@@ -57,6 +58,7 @@ const PANEL_META = {
 };
 // wide modules that were modals: on desktop they open in place like the rest
 const WIDE_META = {
+  track: { title: 'Track', sub: 'What you did each day — work, description, project and status — with a daily summary.', comp: TrackPanel },
   reports: { title: 'Reports & analytics', sub: 'Your month in numbers and a story.', comp: ReportsPanel },
   planner: { title: 'Myth Planner', sub: 'Trips, events, exams, launches — plan it, confirm it, then go live.', comp: PlannerPanel },
   assistant: { title: 'Myth AI', sub: 'Ask anything, hand me a file, or tell me what to add where.', comp: ChatAssistant, flex: true },
@@ -133,9 +135,11 @@ export default function Shell() {
 
   // Esc closes whatever module is open in place
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && panel) setPanel(null); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // An open dialog inside the module takes the Esc for itself. Capture phase: this
+    // runs before the dialog's own handler closes it, while it is still in the DOM.
+    const onKey = (e) => { if (e.key === 'Escape' && panel && !document.querySelector('[role="dialog"]')) setPanel(null); };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [panel, setPanel]);
 
   // the assistant (or a "plan…" action) asked for the planner: switch the bar to Planner mode on the home screen
@@ -152,24 +156,35 @@ export default function Shell() {
       acts.push({ id: `t${t.id}`, label: t.title, description: `Task · ${t.status}`, leftSection: <IconChecklist size={16} />, onClick: () => setPanel('tasks') }));
     state.projects.forEach((p) =>
       acts.push({ id: `p${p.id}`, label: p.name, description: 'Project', leftSection: <IconFolders size={16} />, onClick: () => setPanel('projects') }));
-    state.notes.slice(0, 60).forEach((n) =>
-      acts.push({ id: `n${n.id}`, label: n.title, description: n.type, leftSection: <IconNotes size={16} />, onClick: () => setPanel('notes') }));
     state.events.forEach((e) =>
       acts.push({ id: `e${e.id}`, label: e.title, description: `Event · ${dayjs(e.date).format('MMM D')}`, leftSection: <IconCalendarEvent size={16} />, onClick: () => setPanel('calendar') }));
     state.learning.forEach((l) =>
       acts.push({ id: `l${l.id}`, label: l.title, description: 'Learning pipeline', leftSection: <IconNotes size={16} />, onClick: () => setPanel('learning') }));
     (state.reminders ?? []).filter((r) => !r.done).forEach((r) =>
       acts.push({ id: `r${r.id}`, label: r.title, description: `Reminder · ${dayjs(r.date).format('MMM D')}${r.time ? ` ${r.time}` : ''}`, leftSection: <IconBellRinging size={16} />, onClick: () => setPanel('reminders') }));
+    (state.worklog ?? []).slice(0, 40).forEach((w) =>
+      acts.push({ id: `w${w.id}`, label: w.title, description: `Work log · ${dayjs(w.date).format('MMM D')} · ${fmtMinutes(w.minutes)}`, leftSection: <IconClockPlay size={16} />, onClick: () => setPanel('track') }));
     (state.plannerSessions ?? []).forEach((p) =>
       acts.push({ id: `pl${p.id}`, label: p.title || 'Plan', description: `Myth Planner · ${p.mode} · ${p.status}`, leftSection: <IconCompass size={16} />, onClick: () => { useUI.getState().setPlannerFocus(p.id); showPlannerInline(true); } }));
     return acts;
-  }, [state.tasks, state.projects, state.notes, state.events, state.learning, state.plannerSessions, state.reminders, setPanel, showPlannerInline]);
+  }, [state.tasks, state.projects, state.events, state.learning, state.plannerSessions, state.reminders, state.worklog, setPanel, showPlannerInline]);
 
   const desktop = useMediaQuery('(min-width: 1000px)');
   const mobile = useMediaQuery('(max-width: 768px)');
   const meta = PANEL_META[panel];
   const wideMeta = WIDE_META[panel];
   const inPlace = desktop ? (meta ?? wideMeta) : null;
+
+  // The backdrop video only plays on the home screen: with a module open it is
+  // almost fully covered, so it rests there and the module stays smooth.
+  const bgRef = useRef(null);
+  const [bgReady, setBgReady] = useState(false);
+  const moduleOpen = !!inPlace;
+  useEffect(() => {
+    const v = bgRef.current;
+    if (!v) return;
+    if (moduleOpen) v.pause(); else v.play().catch(() => { /* autoplay refused — the poster stays */ });
+  }, [moduleOpen, desktop]);
 
   // phones: the floating assistant is the centre tab's drawer
   useEffect(() => {
@@ -221,11 +236,17 @@ export default function Shell() {
       <div className="canvas">
         {/* the dashboard's own backdrop: a muted, looping video on desktop; the mobile artwork as a still on phones and tablets */}
         {desktop ? (
-          <video
-            className="canvas-bg canvas-bg-video"
-            src={encodeURI(asset('Home page Back v1.mp4'))}
-            autoPlay muted loop playsInline preload="auto" aria-hidden="true"
-          />
+          <>
+            {/* the poster (first frame, ~70 KB) paints at once; the video fades in over it when it can play */}
+            <div className="canvas-bg canvas-bg-image" style={{ backgroundImage: `url(${HOME_POSTER})` }} aria-hidden="true" />
+            <video
+              ref={bgRef} className="canvas-bg canvas-bg-video" data-ready={bgReady || undefined}
+              autoPlay muted loop playsInline preload="auto" disablePictureInPicture aria-hidden="true"
+              onCanPlay={() => setBgReady(true)}
+            >
+              <source src={HOME_VIDEO} type="video/webm" />
+            </video>
+          </>
         ) : (
           <div
             className="canvas-bg canvas-bg-image"
@@ -277,7 +298,7 @@ export default function Shell() {
           >
             <ChatAssistant initialQuestion={assistantSeed} onConsumedInitial={consumeAssistantSeed} />
           </Drawer>
-          {['reports', 'planner'].map((key) => (
+          {['track', 'reports', 'planner'].map((key) => (
             <Modal
               key={key} opened={panel === key} onClose={() => setPanel(null)} size="xl" radius={mobile ? 0 : 'xl'} fullScreen={mobile} centered={!mobile}
               title={<div><Text fw={800} fz={20}>{WIDE_META[key].title}</Text><Text fz={12.5} c="dimmed" mt={2}>{WIDE_META[key].sub}</Text></div>}
@@ -303,7 +324,7 @@ export default function Shell() {
         nothingFound="Nothing found…"
         highlightQuery
         shortcut={['mod + K', '/']}
-        searchProps={{ leftSection: <IconSearch size={18} />, placeholder: 'Search tasks, projects, notes, events, plans…' }}
+        searchProps={{ leftSection: <IconSearch size={18} />, placeholder: 'Search tasks, projects, events, plans…' }}
       />
     </Box>
   );

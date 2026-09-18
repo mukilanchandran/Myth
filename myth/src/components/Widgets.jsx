@@ -128,7 +128,7 @@ export default function Widgets({ onOpen }) {
       {/* Active projects */}
       <WidgetCard i={2} title="Active projects" icon={<IconFolders size={17} color="#e8590c" />} onClick={() => onOpen('projects')}>
         {projects.length === 0 ? (
-          <Text fz={13} c="dimmed">No projects yet — create one to organise docs, notes & meetings.</Text>
+          <Text fz={13} c="dimmed">No projects yet — create one to organise tasks, milestones & docs.</Text>
         ) : (
           <Stack gap={10}>
             {projects.slice(0, 3).map((p) => {

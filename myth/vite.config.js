@@ -35,6 +35,8 @@ export default defineConfig({
     },
   },
 
-  server: { port: 5173, host: true },
+  // 5180, not Vite's default 5173: another local project already serves localhost:5173.
+  // strictPort fails loudly instead of silently sharing a port again.
+  server: { port: 5180, strictPort: true, host: true },
   preview: { port: 4173, host: true },
 });

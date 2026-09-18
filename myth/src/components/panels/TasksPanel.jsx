@@ -58,7 +58,7 @@ function TaskRow({ task }) {
           </Menu.Dropdown>
         </Menu>
       </Group>
-      <Collapse in={open}>
+      <Collapse expanded={open}>
         <Stack gap="xs" mt="sm" pl={34}>
           <TextInput
             label="Title" size="sm" radius="md"

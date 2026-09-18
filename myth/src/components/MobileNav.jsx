@@ -5,9 +5,9 @@ import { useState } from 'react';
 import { Box, Drawer, SimpleGrid, Stack, Text, ThemeIcon } from '@mantine/core';
 import {
   IconLayoutDashboard, IconChecklist, IconFolders, IconGridDots,
-  IconNotes, IconCalendarMonth, IconChartAreaLine, IconWallet,
+  IconCalendarMonth, IconChartAreaLine, IconWallet,
   IconRepeat, IconSchool, IconCloudLock, IconSettings,
-  IconRobotFace, IconBellRinging,
+  IconRobotFace, IconBellRinging, IconClockPlay,
 } from '@tabler/icons-react';
 
 const PRIMARY = [
@@ -19,8 +19,8 @@ const PRIMARY = [
 ];
 
 const MORE = [
+  { key: 'track', label: 'Track', icon: IconClockPlay, color: '#0f8a7e' },
   { key: 'reminders', label: 'Reminders', icon: IconBellRinging, color: '#e03131' },
-  { key: 'notes', label: 'Notes & Ideas', icon: IconNotes, color: '#7048e8' },
   { key: 'drive', label: 'Drive', icon: IconCloudLock, color: '#1971c2' },
   { key: 'learning', label: 'Learning', icon: IconSchool, color: '#e8590c' },
   { key: 'habits', label: 'Habits', icon: IconRepeat, color: '#0D2D1C' },

@@ -16,7 +16,6 @@ function fakeStore() {
     addTask: (t) => { s.tasks.unshift({ id: `t${s.tasks.length}`, status: 'todo', ...t }); },
     completeTask: (id) => { s.tasks = s.tasks.map((t) => (t.id === id ? { ...t, status: 'done' } : t)); },
     addProject: (p) => { const proj = { id: `p${s.projects.length}`, milestones: [], ...p }; s.projects.unshift(proj); return proj; },
-    addNote: (n) => { const note = { id: `n${s.notes.length}`, ...n }; s.notes.unshift(note); return note; },
     addEvent: (e) => { s.events.unshift({ id: `e${s.events.length}`, ...e }); },
     addTransaction: (t) => { s.transactions.unshift({ id: `x${s.transactions.length}`, ...t }); },
     addHabit: (h) => { s.habits.push({ id: `h${s.habits.length}`, log: {}, ...h }); },

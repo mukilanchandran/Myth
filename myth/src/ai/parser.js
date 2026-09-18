@@ -1,18 +1,17 @@
 // Myth AI capture engine — turns any free text (typed or spoken) into
-// structured items routed to every feature of the platform: tasks, ideas,
-// notes, meetings, expenses, income, habits, birthdays, events, learning,
-// journal entries, projects, reminders and today's-plan items.
+// structured items routed to every feature of the platform: tasks,
+// meetings, expenses, income, habits, birthdays, events, learning,
+// journal entries, projects, reminders, work logs (Track) and today's-plan items.
 // Works fully offline; no external calls.
 import * as chrono from 'chrono-node';
 import dayjs from 'dayjs';
 import { extractPeople } from './text.js';
 import { parseReminder, describeWhen, REPEATS } from './reminders.js';
+import { looksLikeWorkLog, parseWorkLog, projectName, fmtMinutes, WORK_STATUSES } from './worklog.js';
 
 const RX = {
   expense: /(?:spent|paid|bought|purchase[d]?|bill)\s+(?:₹|rs\.?\s*|\$)?\s*(\d[\d,]*(?:\.\d+)?)|(?:₹|rs\.?\s*)\s*(\d[\d,]*(?:\.\d+)?)/i,
   income: /(?:received|salary|credited|earned|income)\s+(?:₹|rs\.?\s*|\$)?\s*(\d[\d,]*(?:\.\d+)?)/i,
-  idea: /^(?:idea[:\-\s]|💡)|(?:\b(?:app|startup|feature|product)\s+idea\b)/i,
-  note: /^(?:note[:\-\s]|nb[:\-\s])|^remember\s+(?!me\b|to\b)/i,
   meeting: /\b(?:meeting|meet with|call with|standup|sync|1:1|one on one|review call|discussion|demo|presentation|interview)\b/i,
   habit: /^habit[:\-\s]/i,
   habitDaily: /\b(?:every\s*day|everyday|daily|every (?:morning|night|evening))\b/i,
@@ -107,7 +106,7 @@ export function parseCapture(raw, projects = []) {
       .replace(/\s*\b(?:by|on|at|before|due|until|for)\s*$/i, '')
       .trim();
   const title = normalize(cleanText || text);
-  // habits/ideas/notes keep their full wording — date words are part of the name
+  // habits and journal entries keep their full wording — date words are part of the name
   const rawTitle = normalize(text);
   const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   const base = { raw, title: cap(title) };
@@ -118,6 +117,12 @@ export function parseCapture(raw, projects = []) {
   if (RX.reminder.test(raw.trim()) || /^(?:don'?t\s+(?:let me\s+)?forget\s+(?:to\s+)?|reminder[:\-\s])/i.test(raw.trim())) {
     const r = parseReminder(raw);
     if (r) return { kind: 'reminder', raw, ...r };
+  }
+  // "worked on GHMC dashboard for 2h", "spent 45 min on code review", "log: demo prep 10am-11:30am" → Track
+  // (before expenses: "spent 2h on…" is time, "spent 250 on…" is money)
+  if (looksLikeWorkLog(raw)) {
+    const w = parseWorkLog(raw, projects);
+    if (w) return { kind: 'worklog', raw, ...w };
   }
   const expMatch = text.match(RX.expense);
   const incMatch = text.match(RX.income);
@@ -134,8 +139,6 @@ export function parseCapture(raw, projects = []) {
     return { kind: 'habit', ...baseRaw, title: name || baseRaw.title };
   }
   if (RX.birthday.test(text)) return { kind: 'birthday', ...base, date: due ?? dayjs().format('YYYY-MM-DD') };
-  if (RX.idea.test(raw.trim())) return { kind: 'idea', ...baseRaw, projectId };
-  if (RX.note.test(raw.trim())) return { kind: 'note', ...baseRaw, projectId };
   if (RX.newProject.test(text)) {
     const name = cap(text.replace(RX.newProject, '').trim());
     if (name) return { kind: 'project', ...base, title: name };
@@ -192,14 +195,6 @@ export function executeCapture(parsed, store) {
       if (isToday(parsed.due)) s.addPlanItems([parsed.title]);
       return `Task added${parsed.due ? ` · due ${dayjs(parsed.due).format('ddd, MMM D')}` : ''}${parsed.priority === 5 ? ' · high priority' : ''}${isToday(parsed.due) ? " · on today's plan" : ''}`;
     }
-    case 'idea':
-      s.addNote({ title: parsed.title, type: 'idea', projectId: parsed.projectId });
-      s.addXp('capture');
-      return 'Idea saved to your vault';
-    case 'note':
-      s.addNote({ title: parsed.title, type: 'note', projectId: parsed.projectId });
-      s.addXp('capture');
-      return 'Note saved';
     case 'meeting': {
       // a meeting is a calendar entry — the place and the people ride along on it
       s.addEvent({ title: parsed.title, date: parsed.date, time: parsed.time, kind: 'meeting', location: parsed.location || null, participants: parsed.participants || null, projectId: parsed.projectId ?? null });
@@ -222,6 +217,12 @@ export function executeCapture(parsed, store) {
     case 'reminder':
       s.addReminder({ title: parsed.title, date: parsed.date, time: parsed.time, repeat: parsed.repeat, category: parsed.category, note: '', source: 'capture' });
       return `Reminder set — ${describeWhen(parsed)}${parsed.repeat !== 'none' ? ` · ${REPEATS[parsed.repeat].toLowerCase()}` : ''}`;
+    case 'worklog': {
+      const entry = s.addWorkLog({ title: parsed.title, date: parsed.date, status: parsed.status, minutes: parsed.minutes, start: parsed.start, end: parsed.end, projectId: parsed.projectId, project: parsed.project, category: parsed.category, source: 'capture' });
+      const p = projectName(entry ?? parsed, s.projects ?? []);
+      const e = entry ?? parsed;
+      return `Work logged — "${e.title}"${p ? ` · ${p}` : ''}${e.status && e.status !== 'done' ? ` · ${WORK_STATUSES[e.status]?.label ?? e.status}` : ''}${e.minutes > 0 ? ` · ${fmtMinutes(e.minutes)}` : ''}${isToday(e.date) ? '' : ` · ${dayjs(e.date).format('ddd, MMM D')}`}`;
+    }
     case 'birthday':
       s.addEvent({ title: parsed.title, date: parsed.date, kind: 'birthday', yearly: true });
       return `Birthday saved for ${dayjs(parsed.date).format('ddd, MMM D')} — I'll remind you every year`;

@@ -116,7 +116,6 @@ test('timeline marks past / now / next and drops a meeting note that duplicates 
       event({ title: 'Gym', time: '18:30' }),
       event({ title: 'Pay rent', kind: 'bill' }),
     ],
-    notes: [{ id: 'n1', type: 'meeting', title: 'Review', meeting: { date: TODAY, time: '15:30' } }],
   });
   const rows = timeline(state, NOW);
   assert.deepEqual(rows.map((r) => [r.title, r.status]), [

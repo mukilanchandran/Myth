@@ -3,8 +3,8 @@
 // with the canvas edge. Talking to Myth happens in the capture bar.
 import { Tooltip, Popover, SimpleGrid, Text, ThemeIcon } from '@mantine/core';
 import {
-  IconHome, IconChecklist, IconFolders, IconNotes, IconCalendarMonth, IconRepeat, IconWallet,
-  IconChartAreaLine, IconGridDots, IconSchool, IconCloudLock, IconSettings, IconLogout, IconLayoutDashboard, IconBellRinging,
+  IconHome, IconChecklist, IconFolders, IconCalendarMonth, IconRepeat, IconWallet,
+  IconChartAreaLine, IconGridDots, IconSchool, IconCloudLock, IconSettings, IconLogout, IconLayoutDashboard, IconBellRinging, IconClockPlay,
 } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
@@ -17,8 +17,8 @@ const MAIN = [
 // everything else lives behind the grid-dots button (the Planner moved into
 // the capture bar's mode dial — it is a way of typing, not a place)
 const MORE = [
+  { key: 'track', label: 'Track', icon: IconClockPlay, color: '#0f8a7e' },
   { key: 'reminders', label: 'Reminders', icon: IconBellRinging, color: '#e03131' },
-  { key: 'notes', label: 'Notes & ideas', icon: IconNotes, color: '#1b5a38' },
   { key: 'habits', label: 'Habits', icon: IconRepeat, color: '#0D2D1C' },
   { key: 'finance', label: 'Finance', icon: IconWallet, color: '#e8590c' },
   { key: 'reports', label: 'Monthly report', icon: IconChartAreaLine, color: '#5f3dc4' },

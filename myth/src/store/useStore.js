@@ -5,6 +5,7 @@ import { APP_PASSWORD, AI_MODEL } from '../config/env';
 import { buildPlan, createProjectFromPlan } from '../ai/projectPlanner';
 import { emptyLearn, learnSkip, learnStart, learnFinish } from '../ai/mithNow';
 import { completePatch } from '../ai/reminders';
+import { placeEntry, fromMin, inferProject, projectPool } from '../ai/worklog';
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 export const today = () => dayjs().format('YYYY-MM-DD');
@@ -74,7 +75,6 @@ export const useStore = create(
         }),
 
       // ---------- tasks ----------
-      // optional fields: noteId (the meeting a follow-up / action item came from), tags
       tasks: [],
       addTask: (t) =>
         set((s) => ({
@@ -123,25 +123,7 @@ export const useStore = create(
         set((s) => ({
           projects: s.projects.filter((p) => p.id !== id),
           tasks: s.tasks.map((t) => (t.projectId === id ? { ...t, projectId: null } : t)),
-          notes: s.notes.map((n) => (n.projectId === id ? { ...n, projectId: null } : n)),
         })),
-
-      // ---------- notes / ideas / meetings ----------
-      notes: [],
-      addNote: (n) => {
-        const note = {
-          id: uid(), title: '', body: '', type: 'note',
-          projectId: null, pinned: false, meeting: null,
-          created: new Date().toISOString(), updated: new Date().toISOString(), ...n,
-        };
-        set((s) => ({ notes: [note, ...s.notes] }));
-        return note;
-      },
-      updateNote: (id, patch) =>
-        set((s) => ({
-          notes: s.notes.map((n) => (n.id === id ? { ...n, ...patch, updated: new Date().toISOString() } : n)),
-        })),
-      deleteNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
 
       // ---------- files (meta only; blobs live in IndexedDB) ----------
       files: [],
@@ -322,6 +304,72 @@ export const useStore = create(
         set((s) => ({ reminders: (s.reminders ?? []).map((r) => (r.id === id ? { ...r, done: false, doneAt: null, snoozedUntil: null } : r)) })),
       deleteReminder: (id) => set((s) => ({ reminders: (s.reminders ?? []).filter((r) => r.id !== id) })),
 
+      // ---------- Track: the daily work log (see ai/worklog.js) ----------
+      // A day is the list of what got done: { id, title, note (description), status: done|progress|review|blocked,
+      //   date, projectId|null, project (free-text name), category, source: manual|timer|ai|capture|suggested, created,
+      //   minutes (0 = no time recorded), start/end 'HH:mm' (only when a clock time was given — the timer, "3pm-4pm") }
+      worklog: [],
+      worklogSummaries: {}, // 'YYYY-MM-DD' -> { text, source: ai|manual, updated } — no entry = the automatic summary
+      worklogTimer: null,   // { title, projectId, project, category, note, startedAt } — the running timer
+      addWorkLog: (e) => {
+        const date = e.date ?? today();
+        // time is optional: a clock time is kept, a bare duration is kept, nothing is fine too
+        const slot = e.start || e.end
+          ? placeEntry({ date, minutes: e.minutes, start: e.start, end: e.end }, get().worklog ?? [])
+          : { start: null, end: null, minutes: Math.max(0, Math.round(Number(e.minutes) || 0)), approx: false };
+        const entry = {
+          id: uid(), title: '', note: '', status: 'done', projectId: null, project: '', category: 'dev', source: 'manual',
+          created: new Date().toISOString(), ...e, date, ...slot,
+        };
+        // no project given: a project the title names (a real one, or a name used in the log before)
+        if (!entry.projectId && !entry.project) {
+          const hit = inferProject(entry.title, projectPool(get().projects, get().worklog ?? []));
+          if (hit) { entry.projectId = hit.id; entry.project = hit.name; }
+        }
+        set((s) => ({ worklog: [entry, ...(s.worklog ?? [])] }));
+        get().addXp('capture');
+        return entry;
+      },
+      updateWorkLog: (id, patch) =>
+        set((s) => ({
+          worklog: (s.worklog ?? []).map((w) => {
+            if (w.id !== id) return w;
+            const next = { ...w, ...patch };
+            const clock = (next.start || next.end) && ('start' in patch || 'end' in patch);
+            return clock ? { ...next, ...placeEntry(next, (s.worklog ?? []).filter((x) => x.id !== id)) } : next;
+          }),
+        })),
+      deleteWorkLog: (id) => set((s) => ({ worklog: (s.worklog ?? []).filter((w) => w.id !== id) })),
+      // one timer at a time: starting a new one files the running one first
+      startWorkTimer: (t) => {
+        if (get().worklogTimer) get().stopWorkTimer();
+        const timer = { title: '', projectId: null, project: '', category: 'dev', note: '', ...t, startedAt: new Date().toISOString() };
+        set({ worklogTimer: timer });
+        return timer;
+      },
+      // stop → a log entry with the real start and end (under a minute is dropped)
+      stopWorkTimer: ({ discard = false } = {}) => {
+        const timer = get().worklogTimer;
+        if (!timer) return null;
+        set({ worklogTimer: null });
+        const began = dayjs(timer.startedAt);
+        const minutes = Math.round(dayjs().diff(began, 'second') / 60);
+        if (discard || minutes < 1) return null;
+        // a timer that ran past midnight is filed on the day it started
+        const startMin = began.hour() * 60 + began.minute();
+        return get().addWorkLog({
+          title: timer.title || 'Focused work', note: timer.note, projectId: timer.projectId, project: timer.project, category: timer.category,
+          date: began.format('YYYY-MM-DD'), start: fromMin(startMin), end: fromMin(Math.max(startMin + 1, startMin + minutes)), source: 'timer',
+        });
+      },
+      setWorkSummary: (date, text, source = 'manual') =>
+        set((s) => {
+          const next = { ...(s.worklogSummaries ?? {}) };
+          if (text && text.trim()) next[date] = { text: text.trim(), source, updated: new Date().toISOString() };
+          else delete next[date];
+          return { worklogSummaries: next };
+        }),
+
       // ---------- Life Command Center: focus blocks ----------
       // "Follow the plan" turns the suggested blocks into calendar events of
       // kind 'focus' (each linked to its task), marks the first task as in
@@ -421,6 +469,7 @@ export const useStore = create(
         set((s) => ({
           tasks: [], projects: [], notes: [], files: [], drive: [], habits: [], transactions: [], journal: [],
           plans: {}, learning: [], events: [], plannerSessions: [], chat: [], chatHistory: [], notifyMuted: {},
+          worklog: [], worklogSummaries: {}, worklogTimer: null,
           nowSession: null, pendingProposal: null,
           xp: { points: 0, streakCount: 0, streakLastDate: null },
           settings: { ...s.settings, seeded: true, seededV2: true, seededV3: true },
@@ -481,7 +530,7 @@ export const useStore = create(
     }),
     {
       name: 'myth-db',
-      version: 9,
+      version: 10,
       // ask for the password on every visit — auth state is session-only
       partialize: (s) => Object.fromEntries(Object.entries(s).filter(([k]) => !['authed', 'pendingProposal', 'syncState', 'syncError', 'lastSyncAt', 'syncConflict'].includes(k))),
       migrate: (persisted, version) => {
@@ -558,6 +607,12 @@ export const useStore = create(
         if (version < 9 && persisted) {
           // v9: reminders
           persisted.reminders ??= [];
+        }
+        if (version < 10 && persisted) {
+          // v10: Track — the daily work log, its summaries and the running timer
+          persisted.worklog ??= [];
+          persisted.worklogSummaries ??= {};
+          persisted.worklogTimer ??= null;
         }
         return persisted;
       },

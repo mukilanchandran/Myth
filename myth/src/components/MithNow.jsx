@@ -50,7 +50,7 @@ export function MithNowButton({ onClick, mobile }) {
     if (w.next) return `${fmtDuration(w.minutes)} before ${w.next.title}`;
     return `${fmtDuration(w.minutes)} of open time today`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, now, state.events, state.notes]);
+  }, [session, now, state.events]);
 
   return (
     <motion.div

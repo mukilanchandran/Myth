@@ -12,17 +12,15 @@ export default function TodayPanel() {
   const overdue = open.filter((t) => t.due && dayjs(t.due).isBefore(dayjs(), 'day'));
   const dueToday = open.filter((t) => t.due === todayKey);
   const doing = open.filter((t) => t.status === 'doing' && !dueToday.includes(t) && !overdue.includes(t));
-  // meetings are calendar entries; a meeting note written by hand shows up too, once
-  const meetingsToday = state.notes.filter((n) => n.type === 'meeting' && n.meeting?.date === todayKey);
+  // meetings are calendar entries
   const eventsToday = state.events
-    .filter((e) => e.date === todayKey || (e.yearly && dayjs(e.date).format('MM-DD') === dayjs().format('MM-DD')))
-    .filter((e) => !(e.kind === 'meeting' && meetingsToday.some((m) => m.title.trim().toLowerCase() === e.title.trim().toLowerCase())));
+    .filter((e) => e.date === todayKey || (e.yearly && dayjs(e.date).format('MM-DD') === dayjs().format('MM-DD')));
 
   const doneToday = state.tasks.filter((t) => t.completedAt && dayjs(t.completedAt).isSame(dayjs(), 'day'));
   const habitsDone = state.habits.filter((h) => h.log[todayKey]).length;
   const dayPlan = (state.plans ?? {})[todayKey] ?? [];
   const planDone = dayPlan.filter((p) => p.done).length;
-  const score = Math.min(100, doneToday.length * 20 + habitsDone * 10 + planDone * 10 + (meetingsToday.length || eventsToday.some((e) => e.kind === 'meeting') ? 10 : 0));
+  const score = Math.min(100, doneToday.length * 20 + habitsDone * 10 + planDone * 10 + (eventsToday.some((e) => e.kind === 'meeting') ? 10 : 0));
 
   const plan = localAnswer('what are my priorities today', state);
 
@@ -61,7 +59,6 @@ export default function TodayPanel() {
       )}
 
       {section('Meetings & events today', IconCalendarEvent, '#7048e8', [
-        ...meetingsToday.map((m) => ({ ...m, _t: m.meeting?.time, _where: m.meeting?.location, _who: m.meeting?.participants })),
         ...eventsToday.map((e) => ({ ...e, _t: e.time, _where: e.location, _who: e.participants })),
       ], (m) => {
         const bits = [m._where, m._who ? `with ${m._who}` : null].filter(Boolean);

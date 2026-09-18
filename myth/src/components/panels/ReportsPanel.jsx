@@ -63,7 +63,7 @@ export default function ReportsPanel() {
   const stats = useMemo(
     () => monthStats(state, month.format('YYYY-MM-DD')),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.tasks, state.notes, state.projects, state.transactions, state.habits, state.journal, month, regenKey]
+    [state.tasks, state.events, state.projects, state.transactions, state.habits, state.journal, month, regenKey]
   );
   const story = narrative(stats, 'Boss');
 
@@ -148,8 +148,8 @@ export default function ReportsPanel() {
             <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
               <BigStat i={1} label="Tasks completed" value={stats.completed} color="#0D2D1C" />
               <BigStat i={2} label="Completion rate" value={stats.completionRate} suffix="%" color="#1971c2" />
-              <BigStat i={3} label="Meetings logged" value={stats.meetings} color="#7048e8" />
-              <BigStat i={4} label="Ideas captured" value={stats.ideas} color="#f08c00" />
+              <BigStat i={3} label="Meetings" value={stats.meetings} color="#7048e8" />
+              <BigStat i={4} label="Open tasks" value={stats.open} color="#f08c00" />
             </SimpleGrid>
 
             {/* Weekly trend */}
